@@ -45,15 +45,16 @@ def download_excel_from_drive(file_id, sheet_name=0):
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def carregar_dados():
-    # Os IDs corretos e organizados conforme a sequência fornecida
+    # Sequência exata de IDs fornecida por si
     ID_MOV = '16GSsk9lcLnXO7YQaJmIW28mM9CrYZuJs'
     ID_INF = '1D3Nz78rVTEDMl8SOU29lXf_TMZz-sy4M'
     ID_METRICAS = '1TLXXzLqLYDJXDO8H7i1Qfk8tNReXPzFy'
     
     # 3.1 Informação dos Ativos
     df_inf = download_excel_from_drive(ID_INF)
+    df_inf.columns = df_inf.columns.astype(str).str.strip()
     
-    # 3.2 Metas (Blindado)
+    # 3.2 Metas (Busca inteligente de abas)
     todas_abas_metricas = download_excel_from_drive(ID_METRICAS, sheet_name=None)
     nomes_abas = list(todas_abas_metricas.keys())
     aba_seg = next((aba for aba in nomes_abas if 'seg' in aba.lower()), nomes_abas[0])
@@ -61,32 +62,32 @@ def carregar_dados():
     df_meta_seg = todas_abas_metricas[aba_seg]
     df_meta_tipo = todas_abas_metricas[aba_tipo]
     
-    # 3.3 Movimentações (Blindado contra erros do AppSheet)
+    df_meta_seg.columns = df_meta_seg.columns.astype(str).str.strip()
+    df_meta_tipo.columns = df_meta_tipo.columns.astype(str).str.strip()
+    
+    # 3.3 Movimentações (Busca inteligente da aba correta do AppSheet)
     todas_abas_mov = download_excel_from_drive(ID_MOV, sheet_name=None)
     df_mov = None
     
-    # Procura a aba que tem a coluna correta e limpa espaços invisíveis
     for aba, df_temp in todas_abas_mov.items():
         df_temp.columns = df_temp.columns.astype(str).str.strip()
         if 'Movimentação' in df_temp.columns:
             df_mov = df_temp
             break
             
-    # Se mesmo assim não achar a coluna na aba certa, pega a primeira aba
     if df_mov is None:
         df_mov = list(todas_abas_mov.values())[0]
         df_mov.columns = df_mov.columns.astype(str).str.strip()
     
-    # Trava de Segurança Visual: Mostra-lhe exatamente o que o robô está a ler
+    # Validação de segurança para garantir a leitura dos cabeçalhos
     if 'Movimentação' not in df_mov.columns:
-        st.error(f"⚠️ O robô abriu o ficheiro de movimentações, mas não encontrou a coluna 'Movimentação'.")
-        st.warning(f"As colunas que ele encontrou foram exatamente estas: {list(df_mov.columns)}")
+        st.error("⚠️ O robô não encontrou a coluna 'Movimentação' no ficheiro selecionado.")
+        st.warning(f"Colunas detetadas: {list(df_mov.columns)}")
         st.stop()
         
-    # Limpa espaços nas colunas mais críticas para evitar falhas nos cálculos
     df_mov['Produto'] = df_mov['Produto'].astype(str).str.strip()
     
-    # 3.4 Processamento de Proventos
+    # 3.4 Processamento de Proventos (Dividendos)
     df_prov = df_mov[df_mov['Movimentação'].isin(['Rendimento', 'Juros Sobre Capital Próprio'])].copy()
     df_prov['Ticker'] = df_prov['Produto'].str.split(' - ').str[0].str.strip()
     df_prov['Data'] = pd.to_datetime(df_prov['Data'], format='%d/%m/%Y', errors='coerce')
@@ -94,7 +95,7 @@ def carregar_dados():
     df_ultimo_prov = df_prov.sort_values('Data').groupby('Ticker')['Valor da Operação'].last().reset_index()
     df_ultimo_prov.rename(columns={'Valor da Operação': 'Ultimo_Provento'}, inplace=True)
     
-    # 3.5 Posição Atual
+    # 3.5 Posição Atual e Cálculo do Preço Médio
     df_carteira = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Compra', 'Venda'])].copy()
     df_carteira['Ticker'] = df_carteira['Produto'].str.split(' - ').str[0].str.strip()
     df_carteira['Quantidade'] = pd.to_numeric(df_carteira['Quantidade'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -106,17 +107,29 @@ def carregar_dados():
     
     return df_consolidado, df_inf, df_meta_seg, df_meta_tipo, df_ultimo_prov
 
-# Executa o Motor
+# Executa o Motor de Dados
 df_atual, df_inf, df_meta_seg, df_meta_tipo, df_ultimo_prov = carregar_dados()
 
-# Cruzamento
+# ==============================================================================
+# 4. CRUZAMENTO E TRATAMENTO DE VALORES (Blindagem do Preço de Mercado)
+# ==============================================================================
 df_alocacao = pd.merge(df_atual, df_inf, on='Ticker', how='left')
 df_alocacao[['Classificacao', 'Tipo', 'Seguimento', 'Gestora']] = df_alocacao[['Classificacao', 'Tipo', 'Seguimento', 'Gestora']].fillna('Não Classificado')
+
+# Garante a limpeza completa de caracteres de texto na cotação atual
+if 'Preco_Atual' in df_alocacao.columns:
+    df_alocacao['Preco_Atual'] = df_alocacao['Preco_Atual'].astype(str).str.replace('R$', '', regex=False).str.strip()
+    df_alocacao['Preco_Atual'] = df_alocacao['Preco_Atual'].str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+    df_alocacao['Preco_Atual'] = pd.to_numeric(df_alocacao['Preco_Atual'], errors='coerce').fillna(0)
+else:
+    df_alocacao['Preco_Atual'] = 0
+
+# Calcula o património total com números puros
 df_alocacao['Patrimonio_Mercado'] = df_alocacao['Quantidade'] * df_alocacao['Preco_Atual']
 total_patrimonio = df_alocacao['Patrimonio_Mercado'].sum()
 
 # ==============================================================================
-# 4. GRÁFICOS (FRONTEND)
+# 5. NAVEGAÇÃO E GRÁFICOS (FRONTEND)
 # ==============================================================================
 aba1, aba2 = st.tabs(["📊 Visão Global (Raio-X)", "⚙️ Operações e Rebalanceamento"])
 
@@ -131,6 +144,7 @@ with aba1:
     df_gestora['Percentual_Texto'] = (df_gestora['Patrimonio_Mercado'] / total_patrimonio * 100).apply(lambda x: f"{x:.1f}%".replace('.', ','))
     df_gestora['Valor_Texto'] = df_gestora['Patrimonio_Mercado'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
+    # Painel da Linha 1
     fig1 = make_subplots(rows=1, cols=2, specs=[[{'type':'xy'}, {'type':'domain'}]], subplot_titles=['<b>Alocação por Ativo</b>', '<b>Papel vs Tijolo</b>'], column_widths=[0.6, 0.4], horizontal_spacing=0.15)
     fig1.add_trace(go.Bar(y=df_ativo['Ticker'], x=df_ativo['Patrimonio_Mercado'], orientation='h', text=df_ativo['Percentual_Texto'], textposition='outside', marker_color='#118DFF', customdata=df_ativo['Valor_Texto'], hovertemplate='<b>Ativo:</b> %{y}<br><b>Exposição:</b> %{customdata}<br><b>Peso:</b> %{text}<extra></extra>'), row=1, col=1)
     fig1.add_trace(go.Pie(labels=df_alocacao['Classificacao'], values=df_alocacao['Patrimonio_Mercado'], hole=0.5, marker=dict(colors=['#5D6D7E', '#5DADE2']), textinfo='label+percent', textposition='auto'), row=1, col=2)
@@ -141,6 +155,7 @@ with aba1:
     
     st.divider()
     
+    # Painel da Linha 2
     fig2 = make_subplots(rows=1, cols=2, specs=[[{'type':'domain'}, {'type':'xy'}]], subplot_titles=['<b>Por Segmento</b>', '<b>Risco por Gestora</b>'], column_widths=[0.4, 0.6], horizontal_spacing=0.15)
     fig2.add_trace(go.Pie(labels=df_alocacao['Seguimento'], values=df_alocacao['Patrimonio_Mercado'], hole=0.5, marker=dict(colors=px.colors.qualitative.Set2), textinfo='label+percent', textposition='auto'), row=1, col=1)
     fig2.add_trace(go.Bar(y=df_gestora['Gestora'], x=df_gestora['Patrimonio_Mercado'], orientation='h', text=df_gestora['Percentual_Texto'], textposition='outside', marker_color='#2C3E50', customdata=df_gestora['Valor_Texto'], hovertemplate='<b>Gestora:</b> %{y}<br><b>Exposição:</b> %{customdata}<br><b>Peso:</b> %{text}<extra></extra>'), row=1, col=2)
