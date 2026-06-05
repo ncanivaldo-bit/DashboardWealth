@@ -35,7 +35,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM HISTÓRICO COMPARATIVO)
+# PROCESSAMENTO DOS DADOS (MÉTODO COLAB ORIGINAL RESTAURADO)
 # ==============================================================================
 try:
     # IDs oficiais
@@ -57,7 +57,7 @@ try:
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
-    # Força conversão numérica segura
+    # Força conversão numérica segura contra strings inválidas ou #REF!
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
@@ -129,7 +129,7 @@ try:
         # Rentabilidade e Variação Absoluta
         rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
-        # --- RECONSTRUÇÃO HISTÓRICA COMPLEMENTAR: PATRIMÔNIO VS INVESTIDO ---
+        # --- RECONSTRUÇÃO DA EVOLUÇÃO PATRIMONIAL HISTÓRICA MÊS A MÊS ---
         df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
         meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
         
@@ -143,39 +143,25 @@ try:
                 m = r['Movimentação']
                 s = str(r['Entrada/Saída']).strip()
                 q = float(r['Quantidade'])
-                v = float(r['Valor da Operação'])
                 
-                if t not in carteira_mes:
-                    carteira_mes[t] = {'qtd': 0.0, 'custo': 0.0}
+                if t not in carteira_mes: carteira_mes[t] = 0.0
                 if m == 'Desdobro':
-                    carteira_mes[t]['qtd'] += q
+                    carteira_mes[t] += q
                 elif m == 'Atualização' and t == 'PCIP11' and q == 159:
                     continue
                 elif m == 'Transferência - Liquidação':
-                    if s == 'Credito':
-                        carteira_mes[t]['qtd'] += q
-                        carteira_mes[t]['custo'] += v
-                    elif s == 'Debito':
-                        if carteira_mes[t]['qtd'] > 0:
-                            pm_m = carteira_mes[t]['custo'] / carteira_mes[t]['qtd']
-                            carteira_mes[t]['qtd'] = max(0.0, carteira_mes[t]['qtd'] - q)
-                            carteira_mes[t]['custo'] = carteira_mes[t]['qtd'] * pm_m
+                    if s == 'Credito': carteira_mes[t] += q
+                    elif s == 'Debito': carteira_mes[t] = max(0.0, carteira_mes[t] - q)
                             
-            patr_do_mes = 0.0
-            inv_do_mes = 0.0
-            for t, dados_m in carteira_mes.items():
-                if dados_m['qtd'] > 0:
+            total_do_mes = 0.0
+            for t, qtd_m in carteira_mes.items():
+                if qtd_m > 0:
                     preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
                     preco_ref = float(preco_f[0]) if len(preco_f) > 0 else 0.0
-                    patr_do_mes += dados_m['qtd'] * preco_ref
-                    inv_do_mes += dados_m['custo']
+                    total_do_mes += qtd_m * preco_ref
                     
-            if patr_do_mes > 0 or inv_do_mes > 0:
-                historico_patrimonio.append({
-                    'Mês': am.strftime('%m/%Y'), 
-                    'Patrimônio (Mercado)': patr_do_mes,
-                    'Total Investido': inv_do_mes
-                })
+            if total_do_mes > 0:
+                historico_patrimonio.append({'Mês': am.strftime('%m/%Y'), 'Patrimônio': total_do_mes})
                 
         df_evolucao = pd.DataFrame(historico_patrimonio)
 
@@ -200,7 +186,7 @@ try:
         aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
         
         with aba_resumo:
-            # Linha de KPIs (Trancados)
+            # Linha de KPIs (Totalmente Trancados e Intactos)
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -251,71 +237,59 @@ try:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ==============================================================================
-            # LINHA DE GRÁFICOS MELHORADA: 60% COMPARATIVO | 40% ROSCA COM VALORES NA LEGENDA
+            # LINHA DE GRÁFICOS: LEVE E CALIBRADA COM OS PADRÕES EXIGIDOS EM 2026
             # ==============================================================================
             g_col1, g_col2 = st.columns([6, 4])
             
             with g_col1:
                 if not df_evolucao.empty:
                     fig_lin = go.Figure()
-                    # Linha do Valor de Mercado (Patrimônio)
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
-                        y=df_evolucao['Patrimônio (Mercado)'],
+                        y=df_evolucao['Patrimônio'],
                         mode='lines+markers',
-                        name='Valor de Mercado',
                         line=dict(color='#2E8B57', width=3),
-                        marker=dict(size=5),
-                        hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
-                    ))
-                    # Linha do Total Investido (Custo acumulado)
-                    fig_lin.add_trace(go.Scatter(
-                        x=df_evolucao['Mês'], 
-                        y=df_evolucao['Total Investido'],
-                        mode='lines+markers',
-                        name='Total Investido',
-                        line=dict(color='#118DFF', width=2, dash='dot'),
-                        marker=dict(size=5),
-                        hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
+                        marker=dict(size=6, color='#2C3E50'),
+                        hovertemplate='<b>Mês:</b> %{x}<br><b>Patrimônio:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
                     fig_lin.update_layout(
-                        title="<b>Evolução Patrimonial: Investido vs Mercado</b>",
+                        title="<b>Evolução Patrimonial Mensal Acumulada</b>",
                         title_font=dict(size=14, color='#2C3E50'),
                         margin=dict(l=40, r=20, t=40, b=30),
-                        height=400,
+                        height=380,
+                        hovermode='closest', # Força renderização leve para evitar Segmentation Fault
                         plot_bgcolor='rgba(0,0,0,0)',
                         paper_bgcolor='rgba(0,0,0,0)',
-                        yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ")
                     )
-                    st.plotly_chart(fig_lin, use_container_width=True)
+                    st.plotly_chart(fig_lin, width='stretch') # Sintaxe padrão de 2026 aplicada
+                else:
+                    st.info("Dados de evolução histórica insuficientes.")
 
             with g_col2:
                 df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
                 
-                # Prepara o rótulo da legenda injetando o Ticker, Valor em Reais e Porcentagem lado a lado
+                # Legenda customizada: Exibe apenas o Ticker e o Percentual limpo
                 lista_legendas = []
                 for _, r_f in df_rosca.iterrows():
-                    v_mi = r_f['Patrimônio Atual']
-                    pct_mi = (v_mi / patrimonio_total) * 100
-                    lista_legendas.append(f"{r_f['Ticker']} (R$ {v_mi:,.0f} | {pct_mi:.1f}%)".replace(',', '.'))
+                    pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100 if patrimonio_total > 0 else 0.0
+                    lista_legendas.append(f"{r_f['Ticker']} ({pct_mi:.1f}%)")
                 
                 fig_pie = go.Figure()
                 fig_pie.add_trace(go.Pie(
-                    labels=lista_legendas, # Aplica a legenda rica customizada
+                    labels=lista_legendas, 
                     values=df_rosca['Patrimônio Atual'],
                     hole=0.5,
-                    textinfo='none', # Remove os textos de dentro do gráfico (limpeza visual)
+                    textinfo='none', 
                     hovertemplate='<b>Ativo:</b> %{label}<extra></extra>'
                 ))
                 fig_pie.update_layout(
                     title="<b>Distribuição e Peso dos Ativos</b>",
                     title_font=dict(size=14, color='#2C3E50'),
                     margin=dict(l=10, r=10, t=40, b=10),
-                    height=400,
+                    height=380,
                     paper_bgcolor='rgba(0,0,0,0)',
                     showlegend=True,
-                    # Força a legenda a ficar fixa à direita, em formato vertical
                     legend=dict(
                         orientation="v", 
                         yanchor="middle", 
@@ -325,7 +299,7 @@ try:
                         font=dict(size=11)
                     )
                 )
-                st.plotly_chart(fig_pie, use_container_width=True)
+                st.plotly_chart(fig_pie, width='stretch') # Sintaxe padrão de 2026 aplicada
 
         with aba_alocacao:
             st.info("Esta aba está pronta para receber o GPS de Rebalanceamento Estratégico nos próximos passos.")
