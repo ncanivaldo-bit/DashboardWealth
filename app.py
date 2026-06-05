@@ -46,6 +46,7 @@ try:
     df_mov = download_excel_from_drive(ID_MOV, sheet_name='Movimentação')
     df_inf = download_excel_from_drive(ID_INF, sheet_name='Inf_Ativos')
     
+    # Limpeza profunda de cabeçalhos (Evita o erro crítico do Streamlit)
     df_mov.columns = df_mov.columns.astype(str).str.strip()
     df_inf.columns = df_inf.columns.astype(str).str.strip()
     
@@ -57,10 +58,17 @@ try:
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
-    # Força conversão numérica segura
+    # Força conversão numérica segura prevenindo nulos ou textos como '-' ou '#REF!'
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
-    df_mov['Preço unitário'] = pd.to_numeric(df_mov['Preço unitário'], errors='coerce').fillna(0)
+    
+    # Tratamento específico para aceitar variações de escrita no nome da coluna de Preço Unitário
+    nome_col_preco = 'Preço unitário' if 'Preço unitário' in df_mov.columns else 'Preço Unitário'
+    if nome_col_preco in df_mov.columns:
+        df_mov['Preço_Unit_Tratado'] = pd.to_numeric(df_mov[nome_col_preco], errors='coerce').fillna(0)
+    else:
+        df_mov['Preço_Unit_Tratado'] = 0.0
+        
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     
     # 3. Processamento de Custódia e Preço Médio Atual
@@ -167,10 +175,9 @@ try:
             for t, dados_m in carteira_mes.items():
                 if dados_m['qtd'] > 0:
                     inv_do_mes += dados_m['custo']
-                    # Busca de preço inteligente da época
-                    df_filtro_epoca = df_ate_o_mes[(df_ate_o_mes['Ticker'] == t) & (df_ate_o_mes['Preço unitário'] > 0)]
+                    df_filtro_epoca = df_ate_o_mes[(df_ate_o_mes['Ticker'] == t) & (df_mov['Preço_Unit_Tratado'] > 0)]
                     if not df_filtro_epoca.empty:
-                        preco_epoca = float(df_filtro_epoca.sort_values('Data').iloc[-1]['Preço unitário'])
+                        preco_epoca = float(df_filtro_epoca.sort_values('Data').iloc[-1]['Preço_Unit_Tratado'])
                     else:
                         preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
                         preco_epoca = float(preco_f[0]) if len(preco_f) > 0 else 0.0
@@ -258,14 +265,13 @@ try:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ==============================================================================
-            # LINHA DE GRÁFICOS CORRIGIDA: HISTÓRICO FIEL VS LEGENDA APENAS PERCENTUAL
+            # LINHA DE GRÁFICOS: 60% COMPARATIVO ÉPOCA | 40% ROSCA COM LEG PERCENTUAL APENAS
             # ==============================================================================
             g_col1, g_col2 = st.columns([6, 4])
             
             with g_col1:
                 if not df_evolucao.empty:
                     fig_lin = go.Figure()
-                    # Linha do Valor de Mercado REAL de época
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Patrimônio (Mercado)'],
@@ -275,7 +281,6 @@ try:
                         marker=dict(size=5),
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    # Linha do Total Investido
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Total Investido'],
@@ -296,14 +301,15 @@ try:
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
                     st.plotly_chart(fig_lin, use_container_width=True)
+                else:
+                    st.info("Dados de evolução histórica insuficientes.")
 
             with g_col2:
                 df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
                 
-                # Ajuste cirúrgico: Legenda exibe estritamente Ticker e a porcentagem limpa
                 lista_legendas = []
                 for _, r_f in df_rosca.iterrows():
-                    pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100
+                    pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100 if patrimonio_total > 0 else 0.0
                     lista_legendas.append(f"{r_f['Ticker']} ({pct_mi:.1f}%)")
                 
                 fig_pie = go.Figure()
@@ -333,10 +339,10 @@ try:
                 st.plotly_chart(fig_pie, use_container_width=True)
 
         with aba_alocacao:
-            st.info("Esta aba está pronta para receber o GPS de Rebalanceamento Estratégico nos próximos passos.")
+            st.info("Esta aba está pronta para receber O GPS de Rebalanceamento Estratégico nos próximos passos.")
         
     else:
         st.warning("Nenhuma operação elegível encontrada.")
 
 except Exception as e:
-    st.error(f"❌ Erro no processamento: {e}")
+    st.error(f"❌ Erro crítico mapeado no processamento: {e}")
