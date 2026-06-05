@@ -112,10 +112,10 @@ try:
         df_prov = df_mov[df_mov['Movimentação'].isin(['Rendimento', 'Juros Sobre Capital Próprio'])].copy()
         total_dividendos = df_prov['Valor da Operação'].sum()
         
-        # Lucro Total (Imagem: Ganho de Capital + Dividendos)
+        # Lucro Total
         lucro_total = ganho_capital + total_dividendos
         
-        # Cartão 3: Último Provento Mensal Pago
+        # Último Provento Mensal Pago
         df_prov['AnoMes'] = df_prov['Data'].dt.to_period('M')
         if not df_prov.empty:
             ultimo_mes_valido = df_prov.sort_values('Data')['AnoMes'].iloc[-1]
@@ -125,7 +125,7 @@ try:
             ultimo_provento_mensal = 0.0
             str_mes_prov = "-"
 
-        # Cartão 4: Rentabilidade e Variação Absoluta
+        # Rentabilidade e Variação Absoluta
         rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
         # --- ESTILIZAÇÃO E CORES ---
@@ -141,68 +141,68 @@ try:
         cor_lucro = "#2E8B57" if lucro_total >= 0 else "#E74C3C"
         cor_ganho = "#2E8B57" if ganho_capital >= 0 else "#E74C3C"
         cor_rent = "#2E8B57" if rentabilidade_pct >= 0 else "#E74C3C"
+        variacao_global = ((patrimonio_total / total_investido) - 1) * 100 if total_investido > 0 else 0.0
+        cor_var_global = "#2E8B57" if variacao_global >= 0 else "#E74C3C"
 
         # ==============================================================================
-        # RESOLUÇÃO VISUAL DA LINHA DE 4 CARTÕES (HTML/CSS CONTORNADOS)
+        # CRIAÇÃO DAS ABAS (NAVEGAÇÃO)
         # ==============================================================================
-        col1, col2, col3, col4 = st.columns(4)
+        aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
         
-        with col1:
-            st.markdown(f"""
-                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                    <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_patrimonio}</div>
-                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                        Total Investido: <span style="color: #34495E; font-weight:bold;">{str_investido}</span>
+        with aba_resumo:
+            # Os 4 KPIs blindados dentro da aba correspondente
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.markdown(f"""
+                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                        <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
+                        <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_patrimonio}</div>
+                        <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                            Total Investido: <span style="color: #34495E; font-weight:bold;">{str_investido}</span>
+                        </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-        with col2:
-            st.markdown(f"""
-                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro Total</span>
-                    <div style="color: {cor_lucro}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_lucro_tot}</div>
-                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                        <span>Ganho Cap: <strong style="color:{cor_ganho};">{str_ganho_cap}</strong></span>
-                        <span>Proventos: <strong style="color:#2E8B57;">{str_div_rec}</strong></span>
+            with col2:
+                st.markdown(f"""
+                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                        <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro Total</span>
+                        <div style="color: {cor_lucro}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_lucro_tot}</div>
+                        <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                            <span>Ganho Cap: <strong style="color:{cor_ganho};">{str_ganho_cap}</strong></span>
+                            <span>Proventos: <strong style="color:#2E8B57;">{str_div_rec}</strong></span>
+                        </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-        with col3:
-            st.markdown(f"""
-                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
-                    <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_ultimo_prov}</div>
-                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                        Mês Ref: <span style="color: #34495E; font-weight:bold;">{str_mes_prov}</span>
+            with col3:
+                st.markdown(f"""
+                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                        <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
+                        <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_ultimo_prov}</div>
+                        <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                            Mês Ref: <span style="color: #34495E; font-weight:bold;">{str_mes_prov}</span>
+                        </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-        with col4:
-            st.markdown(f"""
-                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Variação e Rentabilidade</span>
-                    <div style="color: {cor_ganho}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_ganho_cap}</div>
-                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                        Rentabilidade Comercial: <span style="color: {cor_rent}; font-weight:bold;">{"+" if rentabilidade_pct>=0 else ""}{rentabilidade_pct:.2f}%</span>
+            with col4:
+                st.markdown(f"""
+                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                        <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Variação e Rentabilidade</span>
+                        <div style="color: {cor_ganho}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_ganho_cap}</div>
+                        <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                            Rentabilidade: <span style="color: {cor_rent}; font-weight:bold;">{"+" if rentabilidade_pct>=0 else ""}{rentabilidade_pct:.2f}%</span>
+                        </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                
+            # O espaço abaixo está livre para construirmos o gráfico de evolução histórica mês a mês!
+            st.markdown("<br><h4 style='color: #7F8C8D; text-align: center;'>[Espaço Reservado para o Gráfico de Evolução Patrimonial]</h4>", unsafe_allow_html=True)
 
-        st.divider()
-
-        # Tabela pura para conferência dos saldos
-        st.subheader("Validação de Saldos Atuais")
-        st.dataframe(df_final.style.format({
-            'Quantidade': '{:.0f}',
-            'Preço Médio Real': 'R$ {:.2f}',
-            'Preco_Atual': 'R$ {:.2f}',
-            'Patrimônio Atual': 'R$ {:.2f}',
-            'Total Investido Ativo': 'R$ {:.2f}'
-        }), use_container_width=True)
+        with aba_alocacao:
+            st.info("Esta aba está pronta para receber o GPS de Rebalanceamento Estratégico nos próximos passos.")
         
     else:
         st.warning("Nenhuma operação elegível encontrada.")
