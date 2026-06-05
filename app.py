@@ -35,7 +35,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO)
+# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM BLINDAGEM DE VALORES)
 # ==============================================================================
 try:
     # IDs oficiais
@@ -57,9 +57,10 @@ try:
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
-    # Força conversão numérica
+    # BLINDAGEM CONTRA #REF!: Força conversão numérica segura limpando qualquer erro de fórmula do Excel
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
+    df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     
     # 3. Processamento de Custódia e Preço Médio Atual
     df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização'])].sort_values('Data').copy()
