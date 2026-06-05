@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import io
+import plotly.graph_objects as go
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -60,7 +61,7 @@ try:
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
     
-    # 3. Processamento de Custódia e Preço Médio
+    # 3. Processamento de Custódia e Preço Médio Atual
     df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização'])].sort_values('Data').copy()
     
     carteira = {}
@@ -127,6 +128,50 @@ try:
         # Rentabilidade e Variação Absoluta
         rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
+        # --- RECONSTRUÇÃO DA EVOLUÇÃO PATRIMONIAL HISTÓRICA MÊS A MÊS ---
+        df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
+        meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
+        
+        historico_patrimonio = []
+        for am in meses_historicos:
+            df_ate_o_mes = df_trades[df_trades['AnoMes'] <= am]
+            
+            carteira_mes = {}
+            for _, r in df_ate_o_mes.iterrows():
+                t = r['Ticker']
+                m = r['Movimentação']
+                s = str(r['Entrada/Saída']).strip()
+                q = float(r['Quantidade'])
+                v = float(r['Valor da Operação'])
+                
+                if t not in carteira_mes:
+                    carteira_mes[t] = {'qtd': 0.0, 'custo': 0.0}
+                if m == 'Desdobro':
+                    carteira_mes[t]['qtd'] += q
+                elif m == 'Atualização' and t == 'PCIP11' and q == 159:
+                    continue
+                elif m == 'Transferência - Liquidação':
+                    if s == 'Credito':
+                        carteira_mes[t]['qtd'] += q
+                        carteira_mes[t]['custo'] += v
+                    elif s == 'Debito':
+                        if carteira_mes[t]['qtd'] > 0:
+                            pm_m = carteira_mes[t]['custo'] / carteira_mes[t]['qtd']
+                            carteira_mes[t]['qtd'] = max(0.0, carteira_mes[t]['qtd'] - q)
+                            carteira_mes[t]['custo'] = carteira_mes[t]['qtd'] * pm_m
+                            
+            total_do_mes = 0.0
+            for t, dados_m in carteira_mes.items():
+                if dados_m['qtd'] > 0:
+                    preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
+                    preco_ref = float(preco_f[0]) if len(preco_f) > 0 else 0.0
+                    total_do_mes += dados_m['qtd'] * preco_ref
+                    
+            if total_do_mes > 0:
+                historico_patrimonio.append({'Mês': am.strftime('%m/%Y'), 'Patrimônio': total_do_mes})
+                
+        df_evolucao = pd.DataFrame(historico_patrimonio)
+
         # --- ESTILIZAÇÃO E CORES ---
         def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         
@@ -148,7 +193,7 @@ try:
         aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
         
         with aba_resumo:
-            # Os 4 KPIs blindados dentro da aba correspondente
+            # Linha de KPIs (Permanecem Trancados)
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -196,7 +241,57 @@ try:
                     </div>
                 """, unsafe_allow_html=True)
                 
-            st.markdown("<br><h4 style='color: #7F8C8D; text-align: center;'>[Espaço Reservado para o Gráfico de Evolução Patrimonial]</h4>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # ==============================================================================
+            # LINHA DE GRÁFICOS: 60% EVOLUÇÃO PATRIMONIAL | 40% ATIVOS NA CARTEIRA
+            # ==============================================================================
+            g_col1, g_col2 = st.columns([6, 4])
+            
+            with g_col1:
+                if not df_evolucao.empty:
+                    fig_lin = go.Figure()
+                    fig_lin.add_trace(go.Scatter(
+                        x=df_evolucao['Mês'], 
+                        y=df_evolucao['Patrimônio'],
+                        mode='lines+markers',
+                        line=dict(color='#2E8B57', width=3),
+                        marker=dict(size=6, color='#2C3E50'),
+                        hovertemplate='<b>Mês:</b> %{x}<br><b>Patrimônio:</b> R$ %{y:,.2f}<extra></extra>'
+                    ))
+                    fig_lin.update_layout(
+                        title="<b>Evolução Patrimonial Mensal Acumulada</b>",
+                        title_font=dict(size=14, color='#2C3E50'),
+                        margin=dict(l=40, r=20, t=40, b=30),
+                        height=380,
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ")
+                    )
+                    st.plotly_chart(fig_lin, use_container_width=True)
+                else:
+                    st.info("Dados de evolução histórica insuficientes.")
+
+            with g_col2:
+                df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False)
+                fig_pie = go.Figure()
+                fig_pie.add_trace(go.Pie(
+                    labels=df_rosca['Ticker'],
+                    values=df_rosca['Patrimônio Atual'],
+                    hole=0.5,
+                    textinfo='percent',
+                    hovertemplate='<b>Ativo:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<br><b>Peso:</b> %{percent}<extra></extra>'
+                ))
+                fig_pie.update_layout(
+                    title="<b>Distribuição de Ativos na Carteira</b>",
+                    title_font=dict(size=14, color='#2C3E50'),
+                    margin=dict(l=20, r=20, t=40, b=30),
+                    height=380,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
 
         with aba_alocacao:
             st.info("Esta aba está pronta para receber o GPS de Rebalanceamento Estratégico nos próximos passos.")
