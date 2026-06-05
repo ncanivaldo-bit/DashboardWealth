@@ -19,11 +19,10 @@ st.markdown("🎯 **Missão:** Do vácuo absoluto a renda passiva sustentável")
 st.divider()
 
 # ==============================================================================
-# 2. LIGAÇÃO SEGURA AO GOOGLE DRIVE (A sua Automação)
+# 2. LIGAÇÃO SEGURA AO GOOGLE DRIVE
 # ==============================================================================
 @st.cache_resource
 def get_drive_service():
-    # Lê a chave secreta que guardou no cofre do Streamlit
     key_dict = json.loads(st.secrets["GCP_SERVICE_ACCOUNT"])
     creds = service_account.Credentials.from_service_account_info(
         key_dict, scopes=['https://www.googleapis.com/auth/drive.readonly']
@@ -39,37 +38,54 @@ def download_excel_from_drive(file_id, sheet_name=0):
     while done is False:
         status, done = downloader.next_chunk()
     fh.seek(0)
-    # Se sheet_name for None, o pandas lê todas as abas e devolve um dicionário
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
 # 3. MOTOR DE DADOS E PROCESSAMENTO
 # ==============================================================================
-@st.cache_data(ttl=3600) # O site guarda os dados e atualiza-se sozinho de hora a hora
+@st.cache_data(ttl=3600)
 def carregar_dados():
-    # Os IDs exatos dos seus ficheiros no Google Drive
     ID_INF = '16GSsk9lcLnXO7YQaJmIW28mM9CrYZuJs'
     ID_METRICAS = '1D3Nz78rVTEDMl8SOU29lXf_TMZz-sy4M'
     ID_MOV = '1TLXXzLqLYDJXDO8H7i1Qfk8tNReXPzFy'
     
-    # 3.1 Faz o download da Tabela de Informação dos Ativos
+    # 3.1 Informação dos Ativos
     df_inf = download_excel_from_drive(ID_INF)
     
-    # 3.2 Leitura à prova de balas do ficheiro de Metas (Ignora espaços ou nomes errados)
+    # 3.2 Metas (Blindado)
     todas_abas_metricas = download_excel_from_drive(ID_METRICAS, sheet_name=None)
     nomes_abas = list(todas_abas_metricas.keys())
-    
-    # Procura as abas que contenham "seg" ou "tipo", independentemente de como foram escritas
     aba_seg = next((aba for aba in nomes_abas if 'seg' in aba.lower()), nomes_abas[0])
     aba_tipo = next((aba for aba in nomes_abas if 'tipo' in aba.lower()), nomes_abas[-1])
-    
     df_meta_seg = todas_abas_metricas[aba_seg]
     df_meta_tipo = todas_abas_metricas[aba_tipo]
     
-    # 3.3 Faz o download do Histórico de Movimentações (AppSheet)
-    df_mov = download_excel_from_drive(ID_MOV)
+    # 3.3 Movimentações (Blindado contra erros do AppSheet)
+    todas_abas_mov = download_excel_from_drive(ID_MOV, sheet_name=None)
+    df_mov = None
     
-    # 3.4 Processamento de Proventos (Dividendos)
+    # Procura a aba que tem a coluna correta e limpa espaços invisíveis
+    for aba, df_temp in todas_abas_mov.items():
+        df_temp.columns = df_temp.columns.astype(str).str.strip()
+        if 'Movimentação' in df_temp.columns:
+            df_mov = df_temp
+            break
+            
+    # Se mesmo assim não achar a coluna na aba certa, pega a primeira aba
+    if df_mov is None:
+        df_mov = list(todas_abas_mov.values())[0]
+        df_mov.columns = df_mov.columns.astype(str).str.strip()
+    
+    # Trava de Segurança Visual: Mostra-lhe exatamente o que o robô está a ler
+    if 'Movimentação' not in df_mov.columns:
+        st.error(f"⚠️ O robô abriu o ficheiro de movimentações, mas não encontrou a coluna 'Movimentação'.")
+        st.warning(f"As colunas que ele encontrou foram exatamente estas: {list(df_mov.columns)}")
+        st.stop()
+        
+    # Limpa espaços nas colunas mais críticas para evitar falhas nos cálculos
+    df_mov['Produto'] = df_mov['Produto'].astype(str).str.strip()
+    
+    # 3.4 Processamento de Proventos
     df_prov = df_mov[df_mov['Movimentação'].isin(['Rendimento', 'Juros Sobre Capital Próprio'])].copy()
     df_prov['Ticker'] = df_prov['Produto'].str.split(' - ').str[0].str.strip()
     df_prov['Data'] = pd.to_datetime(df_prov['Data'], format='%d/%m/%Y', errors='coerce')
@@ -77,7 +93,7 @@ def carregar_dados():
     df_ultimo_prov = df_prov.sort_values('Data').groupby('Ticker')['Valor da Operação'].last().reset_index()
     df_ultimo_prov.rename(columns={'Valor da Operação': 'Ultimo_Provento'}, inplace=True)
     
-    # 3.5 Posição Atual e Cálculo do Preço Médio
+    # 3.5 Posição Atual
     df_carteira = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Compra', 'Venda'])].copy()
     df_carteira['Ticker'] = df_carteira['Produto'].str.split(' - ').str[0].str.strip()
     df_carteira['Quantidade'] = pd.to_numeric(df_carteira['Quantidade'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -85,29 +101,27 @@ def carregar_dados():
     
     df_consolidado = df_carteira.groupby('Ticker').agg({'Quantidade': 'sum', 'Valor da Operação': 'sum'}).reset_index()
     df_consolidado['Preco_Medio'] = df_consolidado['Valor da Operação'] / df_consolidado['Quantidade']
-    # Mantém apenas ativos que ainda possui em carteira
     df_consolidado = df_consolidado[df_consolidado['Quantidade'] > 0]
     
     return df_consolidado, df_inf, df_meta_seg, df_meta_tipo, df_ultimo_prov
 
-# Executa o Motor de Dados
+# Executa o Motor
 df_atual, df_inf, df_meta_seg, df_meta_tipo, df_ultimo_prov = carregar_dados()
 
-# Cruzamento de Dados para calcular o Património
+# Cruzamento
 df_alocacao = pd.merge(df_atual, df_inf, on='Ticker', how='left')
 df_alocacao[['Classificacao', 'Tipo', 'Seguimento', 'Gestora']] = df_alocacao[['Classificacao', 'Tipo', 'Seguimento', 'Gestora']].fillna('Não Classificado')
 df_alocacao['Patrimonio_Mercado'] = df_alocacao['Quantidade'] * df_alocacao['Preco_Atual']
 total_patrimonio = df_alocacao['Patrimonio_Mercado'].sum()
 
 # ==============================================================================
-# 4. NAVEGAÇÃO E GRÁFICOS (FRONTEND)
+# 4. GRÁFICOS (FRONTEND)
 # ==============================================================================
 aba1, aba2 = st.tabs(["📊 Visão Global (Raio-X)", "⚙️ Operações e Rebalanceamento"])
 
 with aba1:
     st.header("Análise de Risco e Composição")
     
-    # Prepara dados visuais
     df_ativo = df_alocacao.groupby('Ticker')['Patrimonio_Mercado'].sum().reset_index().sort_values(by='Patrimonio_Mercado', ascending=True)
     df_ativo['Percentual_Texto'] = (df_ativo['Patrimonio_Mercado'] / total_patrimonio * 100).apply(lambda x: f"{x:.1f}%".replace('.', ','))
     df_ativo['Valor_Texto'] = df_ativo['Patrimonio_Mercado'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
@@ -116,7 +130,6 @@ with aba1:
     df_gestora['Percentual_Texto'] = (df_gestora['Patrimonio_Mercado'] / total_patrimonio * 100).apply(lambda x: f"{x:.1f}%".replace('.', ','))
     df_gestora['Valor_Texto'] = df_gestora['Patrimonio_Mercado'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
-    # Gráficos da Linha 1 (Ativos e Classificação)
     fig1 = make_subplots(rows=1, cols=2, specs=[[{'type':'xy'}, {'type':'domain'}]], subplot_titles=['<b>Alocação por Ativo</b>', '<b>Papel vs Tijolo</b>'], column_widths=[0.6, 0.4], horizontal_spacing=0.15)
     fig1.add_trace(go.Bar(y=df_ativo['Ticker'], x=df_ativo['Patrimonio_Mercado'], orientation='h', text=df_ativo['Percentual_Texto'], textposition='outside', marker_color='#118DFF', customdata=df_ativo['Valor_Texto'], hovertemplate='<b>Ativo:</b> %{y}<br><b>Exposição:</b> %{customdata}<br><b>Peso:</b> %{text}<extra></extra>'), row=1, col=1)
     fig1.add_trace(go.Pie(labels=df_alocacao['Classificacao'], values=df_alocacao['Patrimonio_Mercado'], hole=0.5, marker=dict(colors=['#5D6D7E', '#5DADE2']), textinfo='label+percent', textposition='auto'), row=1, col=2)
@@ -127,7 +140,6 @@ with aba1:
     
     st.divider()
     
-    # Gráficos da Linha 2 (Segmento e Gestora)
     fig2 = make_subplots(rows=1, cols=2, specs=[[{'type':'domain'}, {'type':'xy'}]], subplot_titles=['<b>Por Segmento</b>', '<b>Risco por Gestora</b>'], column_widths=[0.4, 0.6], horizontal_spacing=0.15)
     fig2.add_trace(go.Pie(labels=df_alocacao['Seguimento'], values=df_alocacao['Patrimonio_Mercado'], hole=0.5, marker=dict(colors=px.colors.qualitative.Set2), textinfo='label+percent', textposition='auto'), row=1, col=1)
     fig2.add_trace(go.Bar(y=df_gestora['Gestora'], x=df_gestora['Patrimonio_Mercado'], orientation='h', text=df_gestora['Percentual_Texto'], textposition='outside', marker_color='#2C3E50', customdata=df_gestora['Valor_Texto'], hovertemplate='<b>Gestora:</b> %{y}<br><b>Exposição:</b> %{customdata}<br><b>Peso:</b> %{text}<extra></extra>'), row=1, col=2)
@@ -139,9 +151,7 @@ with aba1:
 with aba2:
     st.header("GPS de Rebalanceamento")
     
-    # Cruzamento para Tabela de Rebalanceamento
     df_tabela = pd.merge(df_alocacao, df_ultimo_prov, on='Ticker', how='left').fillna(0)
-    # Variação: Distância percentual entre Preço Médio e Preço de Mercado Atual
     df_tabela['Variacao_Pct'] = ((df_tabela['Preco_Atual'] / df_tabela['Preco_Medio']) - 1) * 100
     df_tabela = pd.merge(df_tabela, df_meta_seg, on='Seguimento', how='left').fillna(0)
     
@@ -151,13 +161,11 @@ with aba2:
     df_tabela['Aporte_Necessario'] = df_tabela['Valor_Alvo_RS'] - df_tabela['Patrimonio_Mercado']
     df_tabela = df_tabela.sort_values(by='Aporte_Necessario', ascending=False)
     
-    # Formatação visual de Moeda e Sinais
     def f_rs(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     
     df_tabela['Acao_Str'] = df_tabela['Aporte_Necessario'].apply(lambda x: f"Comprar {f_rs(abs(x))}" if x > 0 else f"Excesso {f_rs(abs(x))}")
     df_tabela['Variacao_Str'] = df_tabela['Variacao_Pct'].apply(lambda x: f"+{abs(x):.2f}%".replace('.', ',') if x >= 0 else f"-{abs(x):.2f}%".replace('.', ','))
     
-    # Configuração de Cores da Tabela
     cor_padrao, cor_vd, cor_vm = '#2C3E50', '#2E8B57', '#E74C3C'
     cores_var = [cor_vd if v >= 0 else cor_vm for v in df_tabela['Variacao_Pct']]
     cores_acao = [cor_vd if v > 0 else cor_vm for v in df_tabela['Aporte_Necessario']]
@@ -168,7 +176,6 @@ with aba2:
         cores_acao, cores_var, [cor_padrao]*len(df_tabela)
     ]
     
-    # Desenho da Tabela Plotly
     fig_tab = go.Figure(data=[go.Table(
         columnwidth=[60, 50, 90, 90, 90, 90, 130, 80, 90],
         header=dict(values=['<b>Ativo</b>', '<b>Cotas</b>', '<b>Preço Médio</b>', '<b>Cotação Atual</b>', '<b>Saldo Atual</b>', '<b>Saldo Ideal</b>', '<b>Ordem (Meta)</b>', '<b>Variação (%)</b>', '<b>Últ. Provento</b>'], fill_color='#2C3E50', align='center', font=dict(color='white', size=13)),
