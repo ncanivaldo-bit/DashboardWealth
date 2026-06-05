@@ -7,10 +7,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # Configuração de tela limpa
-st.set_page_config(page_title="PREVPRIV | Painel", page_icon="📊", layout="wide")
-st.title("PREVPRIV: Dashboard Wealth")
-st.markdown("🎯 **Missão:** Do vácuo absoluto a renda passiva sustentável")
-st.divider()
+st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
+st.title("PREVPRIV")
+st.markdown("<p style='margin-bottom: -10px; font-size: 16px;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
 
 # ==============================================================================
 # CONEXÃO COM O GOOGLE DRIVE
@@ -141,12 +140,11 @@ try:
         cor_lucro = "#2E8B57" if lucro_total >= 0 else "#E74C3C"
         cor_ganho = "#2E8B57" if ganho_capital >= 0 else "#E74C3C"
         cor_rent = "#2E8B57" if rentabilidade_pct >= 0 else "#E74C3C"
-        variacao_global = ((patrimonio_total / total_investido) - 1) * 100 if total_investido > 0 else 0.0
-        cor_var_global = "#2E8B57" if variacao_global >= 0 else "#E74C3C"
 
         # ==============================================================================
         # CRIAÇÃO DAS ABAS (NAVEGAÇÃO)
         # ==============================================================================
+        st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
         aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
         
         with aba_resumo:
@@ -198,7 +196,6 @@ try:
                     </div>
                 """, unsafe_allow_html=True)
                 
-            # O espaço abaixo está livre para construirmos o gráfico de evolução histórica mês a mês!
             st.markdown("<br><h4 style='color: #7F8C8D; text-align: center;'>[Espaço Reservado para o Gráfico de Evolução Patrimonial]</h4>", unsafe_allow_html=True)
 
         with aba_alocacao:
