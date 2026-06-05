@@ -35,7 +35,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM HISTÓRICO REAL DE ÉPOCA)
+# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM VALORAÇÃO DE ÉPOCA)
 # ==============================================================================
 try:
     # IDs oficiais
@@ -130,7 +130,7 @@ try:
         # Rentabilidade e Variação Absoluta
         rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
-        # --- RECONSTRUÇÃO HISTÓRICA COM PREÇOS REAIS DE ÉPOCA ---
+        # --- RECONSTRUÇÃO HISTÓRICA COM PREÇOS REAIS MENSAIS DE ÉPOCA ---
         df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
         meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
         
@@ -167,10 +167,12 @@ try:
             for t, dados_m in carteira_mes.items():
                 if dados_m['qtd'] > 0:
                     inv_do_mes += dados_m['custo']
-                    # Busca de preço inteligente da época
-                    df_filtro_epoca = df_ate_o_mes[(df_ate_o_mes['Ticker'] == t) & (df_ate_o_mes['Preço unitário'] > 0)]
-                    if not df_filtro_epoca.empty:
-                        preco_epoca = float(df_filtro_epoca.sort_values('Data').iloc[-1]['Preço unitário'])
+                    
+                    # Filtra movimentações com preço válido daquele ativo ATÉ o mês de referência
+                    df_preco_historico = df_ate_o_mes[(df_ate_o_mes['Ticker'] == t) & (df_ate_o_mes['Preço unitário'] > 0)]
+                    if not df_preco_historico.empty:
+                        # Pega o preço unitário da última operação que você fez naquele ativo até aquele mês
+                        preco_epoca = float(df_preco_historico.sort_values('Data').iloc[-1]['Preço unitário'])
                     else:
                         preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
                         preco_epoca = float(preco_f[0]) if len(preco_f) > 0 else 0.0
@@ -258,14 +260,14 @@ try:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ==============================================================================
-            # LINHA DE GRÁFICOS CORRIGIDA: HISTÓRICO FIEL VS LEGENDA APENAS PERCENTUAL
+            # LINHA DE GRÁFICOS: 60% COMPARATIVO HISTÓRICO REAL | 40% ROSCA COM LEG PERCENTUAL
             # ==============================================================================
             g_col1, g_col2 = st.columns([6, 4])
             
             with g_col1:
                 if not df_evolucao.empty:
                     fig_lin = go.Figure()
-                    # Linha do Valor de Mercado REAL de época
+                    # Linha do Valor de Mercado REAL calculado com o preço de cada respectivo mês
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Patrimônio (Mercado)'],
@@ -275,7 +277,7 @@ try:
                         marker=dict(size=5),
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    # Linha do Total Investido
+                    # Linha do Total Investido (Custo de Aquisição)
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Total Investido'],
@@ -290,20 +292,23 @@ try:
                         title_font=dict(size=14, color='#2C3E50'),
                         margin=dict(l=40, r=20, t=40, b=30),
                         height=400,
+                        hovermode='closest',
                         plot_bgcolor='rgba(0,0,0,0)',
                         paper_bgcolor='rgba(0,0,0,0)',
                         yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
-                    st.plotly_chart(fig_lin, use_container_width=True)
+                    st.plotly_chart(fig_lin, width='stretch')
+                else:
+                    st.info("Dados de evolução histórica insuficientes.")
 
             with g_col2:
                 df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
                 
-                # Ajuste cirúrgico: Legenda exibe estritamente Ticker e a porcentagem limpa
+                # Legenda exibe estritamente Ticker e a porcentagem limpa
                 lista_legendas = []
                 for _, r_f in df_rosca.iterrows():
-                    pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100
+                    pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100 if patrimonio_total > 0 else 0.0
                     lista_legendas.append(f"{r_f['Ticker']} ({pct_mi:.1f}%)")
                 
                 fig_pie = go.Figure()
@@ -330,7 +335,7 @@ try:
                         font=dict(size=11)
                     )
                 )
-                st.plotly_chart(fig_pie, use_container_width=True)
+                st.plotly_chart(fig_pie, width='stretch')
 
         with aba_alocacao:
             st.info("Esta aba está pronta para receber o GPS de Rebalanceamento Estratégico nos próximos passos.")
