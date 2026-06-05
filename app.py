@@ -45,9 +45,10 @@ def download_excel_from_drive(file_id, sheet_name=0):
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def carregar_dados():
+    # Os IDs corretos e organizados conforme a sequência fornecida
+    ID_MOV = '16GSsk9lcLnXO7YQaJmIW28mM9CrYZuJs'
     ID_INF = '1D3Nz78rVTEDMl8SOU29lXf_TMZz-sy4M'
     ID_METRICAS = '1TLXXzLqLYDJXDO8H7i1Qfk8tNReXPzFy'
-    ID_MOV = '16GSsk9lcLnXO7YQaJmIW28mM9CrYZuJs'
     
     # 3.1 Informação dos Ativos
     df_inf = download_excel_from_drive(ID_INF)
