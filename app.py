@@ -35,7 +35,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM HISTÓRICO COMPARATIVO)
+# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM HISTÓRICO REAL DE ÉPOCA)
 # ==============================================================================
 try:
     # IDs oficiais
@@ -60,6 +60,7 @@ try:
     # Força conversão numérica segura
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
+    df_mov['Preço unitário'] = pd.to_numeric(df_mov['Preço unitário'], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     
     # 3. Processamento de Custódia e Preço Médio Atual
@@ -129,7 +130,7 @@ try:
         # Rentabilidade e Variação Absoluta
         rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
-        # --- RECONSTRUÇÃO HISTÓRICA COMPLEMENTAR: PATRIMÔNIO VS INVESTIDO ---
+        # --- RECONSTRUÇÃO HISTÓRICA COM PREÇOS REAIS DE ÉPOCA ---
         df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
         meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
         
@@ -165,10 +166,16 @@ try:
             inv_do_mes = 0.0
             for t, dados_m in carteira_mes.items():
                 if dados_m['qtd'] > 0:
-                    preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
-                    preco_ref = float(preco_f[0]) if len(preco_f) > 0 else 0.0
-                    patr_do_mes += dados_m['qtd'] * preco_ref
                     inv_do_mes += dados_m['custo']
+                    # Busca de preço inteligente da época
+                    df_filtro_epoca = df_ate_o_mes[(df_ate_o_mes['Ticker'] == t) & (df_ate_o_mes['Preço unitário'] > 0)]
+                    if not df_filtro_epoca.empty:
+                        preco_epoca = float(df_filtro_epoca.sort_values('Data').iloc[-1]['Preço unitário'])
+                    else:
+                        preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
+                        preco_epoca = float(preco_f[0]) if len(preco_f) > 0 else 0.0
+                        
+                    patr_do_mes += dados_m['qtd'] * preco_epoca
                     
             if patr_do_mes > 0 or inv_do_mes > 0:
                 historico_patrimonio.append({
@@ -251,14 +258,14 @@ try:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ==============================================================================
-            # LINHA DE GRÁFICOS MELHORADA: 60% COMPARATIVO | 40% ROSCA COM VALORES NA LEGENDA
+            # LINHA DE GRÁFICOS CORRIGIDA: HISTÓRICO FIEL VS LEGENDA APENAS PERCENTUAL
             # ==============================================================================
             g_col1, g_col2 = st.columns([6, 4])
             
             with g_col1:
                 if not df_evolucao.empty:
                     fig_lin = go.Figure()
-                    # Linha do Valor de Mercado (Patrimônio)
+                    # Linha do Valor de Mercado REAL de época
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Patrimônio (Mercado)'],
@@ -268,7 +275,7 @@ try:
                         marker=dict(size=5),
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    # Linha do Total Investido (Custo acumulado)
+                    # Linha do Total Investido
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Total Investido'],
@@ -293,19 +300,18 @@ try:
             with g_col2:
                 df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
                 
-                # Prepara o rótulo da legenda injetando o Ticker, Valor em Reais e Porcentagem lado a lado
+                # Ajuste cirúrgico: Legenda exibe estritamente Ticker e a porcentagem limpa
                 lista_legendas = []
                 for _, r_f in df_rosca.iterrows():
-                    v_mi = r_f['Patrimônio Atual']
-                    pct_mi = (v_mi / patrimonio_total) * 100
-                    lista_legendas.append(f"{r_f['Ticker']} (R$ {v_mi:,.0f} | {pct_mi:.1f}%)".replace(',', '.'))
+                    pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100
+                    lista_legendas.append(f"{r_f['Ticker']} ({pct_mi:.1f}%)")
                 
                 fig_pie = go.Figure()
                 fig_pie.add_trace(go.Pie(
-                    labels=lista_legendas, # Aplica a legenda rica customizada
+                    labels=lista_legendas, 
                     values=df_rosca['Patrimônio Atual'],
                     hole=0.5,
-                    textinfo='none', # Remove os textos de dentro do gráfico (limpeza visual)
+                    textinfo='none', 
                     hovertemplate='<b>Ativo:</b> %{label}<extra></extra>'
                 ))
                 fig_pie.update_layout(
@@ -315,7 +321,6 @@ try:
                     height=400,
                     paper_bgcolor='rgba(0,0,0,0)',
                     showlegend=True,
-                    # Força a legenda a ficar fixa à direita, em formato vertical
                     legend=dict(
                         orientation="v", 
                         yanchor="middle", 
