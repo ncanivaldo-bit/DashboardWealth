@@ -35,7 +35,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM HISTÓRICO REAL DE ÉPOCA)
+# PROCESSAMENTO DOS DADOS (MÉTODO COLAB ORIGINAL RESTAURADO)
 # ==============================================================================
 try:
     # IDs oficiais
@@ -46,7 +46,6 @@ try:
     df_mov = download_excel_from_drive(ID_MOV, sheet_name='Movimentação')
     df_inf = download_excel_from_drive(ID_INF, sheet_name='Inf_Ativos')
     
-    # Limpeza profunda de cabeçalhos (Evita o erro crítico do Streamlit)
     df_mov.columns = df_mov.columns.astype(str).str.strip()
     df_inf.columns = df_inf.columns.astype(str).str.strip()
     
@@ -58,17 +57,9 @@ try:
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
-    # Força conversão numérica segura prevenindo nulos ou textos como '-' ou '#REF!'
+    # Força conversão numérica segura contra strings inválidas ou #REF!
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
-    
-    # Tratamento específico para aceitar variações de escrita no nome da coluna de Preço Unitário
-    nome_col_preco = 'Preço unitário' if 'Preço unitário' in df_mov.columns else 'Preço Unitário'
-    if nome_col_preco in df_mov.columns:
-        df_mov['Preço_Unit_Tratado'] = pd.to_numeric(df_mov[nome_col_preco], errors='coerce').fillna(0)
-    else:
-        df_mov['Preço_Unit_Tratado'] = 0.0
-        
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     
     # 3. Processamento de Custódia e Preço Médio Atual
@@ -138,7 +129,7 @@ try:
         # Rentabilidade e Variação Absoluta
         rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
-        # --- RECONSTRUÇÃO HISTÓRICA COM PREÇOS REAIS DE ÉPOCA ---
+        # --- RECONSTRUÇÃO DA EVOLUÇÃO PATRIMONIAL HISTÓRICA MÊS A MÊS ---
         df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
         meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
         
@@ -152,44 +143,25 @@ try:
                 m = r['Movimentação']
                 s = str(r['Entrada/Saída']).strip()
                 q = float(r['Quantidade'])
-                v = float(r['Valor da Operação'])
                 
-                if t not in carteira_mes:
-                    carteira_mes[t] = {'qtd': 0.0, 'custo': 0.0}
+                if t not in carteira_mes: carteira_mes[t] = 0.0
                 if m == 'Desdobro':
-                    carteira_mes[t]['qtd'] += q
+                    carteira_mes[t] += q
                 elif m == 'Atualização' and t == 'PCIP11' and q == 159:
                     continue
                 elif m == 'Transferência - Liquidação':
-                    if s == 'Credito':
-                        carteira_mes[t]['qtd'] += q
-                        carteira_mes[t]['custo'] += v
-                    elif s == 'Debito':
-                        if carteira_mes[t]['qtd'] > 0:
-                            pm_m = carteira_mes[t]['custo'] / carteira_mes[t]['qtd']
-                            carteira_mes[t]['qtd'] = max(0.0, carteira_mes[t]['qtd'] - q)
-                            carteira_mes[t]['custo'] = carteira_mes[t]['qtd'] * pm_m
+                    if s == 'Credito': carteira_mes[t] += q
+                    elif s == 'Debito': carteira_mes[t] = max(0.0, carteira_mes[t] - q)
                             
-            patr_do_mes = 0.0
-            inv_do_mes = 0.0
-            for t, dados_m in carteira_mes.items():
-                if dados_m['qtd'] > 0:
-                    inv_do_mes += dados_m['custo']
-                    df_filtro_epoca = df_ate_o_mes[(df_ate_o_mes['Ticker'] == t) & (df_mov['Preço_Unit_Tratado'] > 0)]
-                    if not df_filtro_epoca.empty:
-                        preco_epoca = float(df_filtro_epoca.sort_values('Data').iloc[-1]['Preço_Unit_Tratado'])
-                    else:
-                        preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
-                        preco_epoca = float(preco_f[0]) if len(preco_f) > 0 else 0.0
-                        
-                    patr_do_mes += dados_m['qtd'] * preco_epoca
+            total_do_mes = 0.0
+            for t, qtd_m in carteira_mes.items():
+                if qtd_m > 0:
+                    preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
+                    preco_ref = float(preco_f[0]) if len(preco_f) > 0 else 0.0
+                    total_do_mes += qtd_m * preco_ref
                     
-            if patr_do_mes > 0 or inv_do_mes > 0:
-                historico_patrimonio.append({
-                    'Mês': am.strftime('%m/%Y'), 
-                    'Patrimônio (Mercado)': patr_do_mes,
-                    'Total Investido': inv_do_mes
-                })
+            if total_do_mes > 0:
+                historico_patrimonio.append({'Mês': am.strftime('%m/%Y'), 'Patrimônio': total_do_mes})
                 
         df_evolucao = pd.DataFrame(historico_patrimonio)
 
@@ -214,7 +186,7 @@ try:
         aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
         
         with aba_resumo:
-            # Linha de KPIs (Trancados)
+            # Linha de KPIs (Totalmente Trancados e Intactos)
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -265,7 +237,7 @@ try:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ==============================================================================
-            # LINHA DE GRÁFICOS: 60% COMPARATIVO ÉPOCA | 40% ROSCA COM LEG PERCENTUAL APENAS
+            # LINHA DE GRÁFICOS: 60% EVOLUÇÃO LINHA VERDE | 40% ROSCA COM LEGENDA LIMPA À DIREITA
             # ==============================================================================
             g_col1, g_col2 = st.columns([6, 4])
             
@@ -274,31 +246,20 @@ try:
                     fig_lin = go.Figure()
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
-                        y=df_evolucao['Patrimônio (Mercado)'],
+                        y=df_evolucao['Patrimônio'],
                         mode='lines+markers',
-                        name='Valor de Mercado',
                         line=dict(color='#2E8B57', width=3),
-                        marker=dict(size=5),
-                        hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
-                    ))
-                    fig_lin.add_trace(go.Scatter(
-                        x=df_evolucao['Mês'], 
-                        y=df_evolucao['Total Investido'],
-                        mode='lines+markers',
-                        name='Total Investido',
-                        line=dict(color='#118DFF', width=2, dash='dot'),
-                        marker=dict(size=5),
-                        hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
+                        marker=dict(size=6, color='#2C3E50'),
+                        hovertemplate='<b>Mês:</b> %{x}<br><b>Patrimônio:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
                     fig_lin.update_layout(
-                        title="<b>Evolução Patrimonial: Investido vs Mercado</b>",
+                        title="<b>Evolução Patrimonial Mensal Acumulada</b>",
                         title_font=dict(size=14, color='#2C3E50'),
                         margin=dict(l=40, r=20, t=40, b=30),
-                        height=400,
+                        height=380,
                         plot_bgcolor='rgba(0,0,0,0)',
                         paper_bgcolor='rgba(0,0,0,0)',
-                        yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ")
                     )
                     st.plotly_chart(fig_lin, use_container_width=True)
                 else:
@@ -307,6 +268,7 @@ try:
             with g_col2:
                 df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
                 
+                # Legenda customizada: Exibe apenas o Ticker e o Percentual limpo
                 lista_legendas = []
                 for _, r_f in df_rosca.iterrows():
                     pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100 if patrimonio_total > 0 else 0.0
@@ -317,16 +279,17 @@ try:
                     labels=lista_legendas, 
                     values=df_rosca['Patrimônio Atual'],
                     hole=0.5,
-                    textinfo='none', 
+                    textinfo='none', # Limpa o texto de dentro do gráfico
                     hovertemplate='<b>Ativo:</b> %{label}<extra></extra>'
                 ))
                 fig_pie.update_layout(
                     title="<b>Distribuição e Peso dos Ativos</b>",
                     title_font=dict(size=14, color='#2C3E50'),
                     margin=dict(l=10, r=10, t=40, b=10),
-                    height=400,
+                    height=380,
                     paper_bgcolor='rgba(0,0,0,0)',
                     showlegend=True,
+                    # Força a legenda a ficar na vertical ao lado direito
                     legend=dict(
                         orientation="v", 
                         yanchor="middle", 
@@ -339,10 +302,10 @@ try:
                 st.plotly_chart(fig_pie, use_container_width=True)
 
         with aba_alocacao:
-            st.info("Esta aba está pronta para receber O GPS de Rebalanceamento Estratégico nos próximos passos.")
+            st.info("Esta aba está pronta para receber o GPS de Rebalanceamento Estratégico nos próximos passos.")
         
     else:
         st.warning("Nenhuma operação elegível encontrada.")
 
 except Exception as e:
-    st.error(f"❌ Erro crítico mapeado no processamento: {e}")
+    st.error(f"❌ Erro no processamento: {e}")
