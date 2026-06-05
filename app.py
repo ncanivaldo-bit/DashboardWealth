@@ -35,7 +35,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO DOS DADOS (MÉTODO COLAB)
+# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO)
 # ==============================================================================
 try:
     # IDs oficiais
@@ -103,53 +103,98 @@ try:
         df_final = pd.merge(df_consolidado, df_inf[['Ticker', 'Preco_Atual', 'Seguimento', 'Classificacao', 'Tipo']], on='Ticker', how='left')
         df_final['Patrimônio Atual'] = df_final['Quantidade'] * df_final['Preco_Atual']
         
-        # Cálculos Globais dos Indicadores
+        # --- CÁLCULO DOS VALORES GLOBAIS ---
         patrimonio_total = df_final['Patrimônio Atual'].sum()
         total_investido = df_final['Total Investido Ativo'].sum()
+        ganho_capital = patrimonio_total - total_investido
         
-        # Variação Percentual Global da Carteira
-        if total_investido > 0:
-            variacao_global = ((patrimonio_total / total_investido) - 1) * 100
+        # Extração de Dividendos Acumulados
+        df_prov = df_mov[df_mov['Movimentação'].isin(['Rendimento', 'Juros Sobre Capital Próprio'])].copy()
+        total_dividendos = df_prov['Valor da Operação'].sum()
+        
+        # Lucro Total (Imagem: Ganho de Capital + Dividendos)
+        lucro_total = ganho_capital + total_dividendos
+        
+        # Cartão 3: Último Provento Mensal Pago
+        df_prov['AnoMes'] = df_prov['Data'].dt.to_period('M')
+        if not df_prov.empty:
+            ultimo_mes_valido = df_prov.sort_values('Data')['AnoMes'].iloc[-1]
+            ultimo_provento_mensal = df_prov[df_prov['AnoMes'] == ultimo_mes_valido]['Valor da Operação'].sum()
+            str_mes_prov = ultimo_mes_valido.strftime('%m/%Y')
         else:
-            variacao_global = 0.0
-            
-        # Define a cor da variação de acordo com o resultado
-        cor_variacao = "#2E8B57" if variacao_global >= 0 else "#E74C3C"
-        sinal_variacao = "+" if variacao_global >= 0 else ""
+            ultimo_provento_mensal = 0.0
+            str_mes_prov = "-"
+
+        # Cartão 4: Rentabilidade e Variação Absoluta
+        rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
-        # Formatação em formato de moeda brasileira
-        str_patrimonio = f"R$ {patrimonio_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        str_investido = f"R$ {total_investido:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        str_variacao = f"{sinal_variacao}{variacao_global:.2f}%".replace('.', ',')
+        # --- ESTILIZAÇÃO E CORES ---
+        def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        
+        str_patrimonio = formatar_br(patrimonio_total)
+        str_investido = formatar_br(total_investido)
+        str_ganho_cap = formatar_br(ganho_capital)
+        str_div_rec = formatar_br(total_dividendos)
+        str_lucro_tot = formatar_br(lucro_total)
+        str_ultimo_prov = formatar_br(ultimo_provento_mensal)
+        
+        cor_lucro = "#2E8B57" if lucro_total >= 0 else "#E74C3C"
+        cor_ganho = "#2E8B57" if ganho_capital >= 0 else "#E74C3C"
+        cor_rent = "#2E8B57" if rentabilidade_pct >= 0 else "#E74C3C"
 
         # ==============================================================================
-        # RENDEREZAÇÃO DO CARTÃO PERSONALIZADO (CSS STYLING)
+        # RESOLUÇÃO VISUAL DA LINHA DE 4 CARTÕES (HTML/CSS CONTORNADOS)
         # ==============================================================================
-        st.markdown(f"""
-            <div style="
-                border: 1px solid #E6E8EA; 
-                border-radius: 8px; 
-                padding: 20px; 
-                background-color: #F8F9FA; 
-                box-shadow: 1px 1px 4px rgba(0,0,0,0.05);
-                width: fit-content;
-                min-width: 350px;
-                margin-bottom: 25px;
-            ">
-                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; uppercase;">PATRIMÔNIO ATUAL</span>
-                <div style="color: #2C3E50; font-size: 32px; font-weight: 700; margin-top: 5px; margin-bottom: 10px;">
-                    {str_patrimonio}
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
+                    <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_patrimonio}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                        Total Investido: <span style="color: #34495E; font-weight:bold;">{str_investido}</span>
+                    </div>
                 </div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 10px; font-size: 14px; color: #7F8C8D;">
-                    Total Investido: <strong style="color: #34495E;">{str_investido}</strong> 
-                    <span style="color: {cor_variacao}; font-weight: bold; margin-left: 8px;">
-                        ({str_variacao})
-                    </span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-        # Exibe a tabela pura de validação abaixo do cartão
+        with col2:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro Total</span>
+                    <div style="color: {cor_lucro}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_lucro_tot}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <span>Ganho Cap: <strong style="color:{cor_ganho};">{str_ganho_cap}</strong></span>
+                        <span>Proventos: <strong style="color:#2E8B57;">{str_div_rec}</strong></span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col3:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
+                    <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_ultimo_prov}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                        Mês Ref: <span style="color: #34495E; font-weight:bold;">{str_mes_prov}</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col4:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                    <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Variação e Rentabilidade</span>
+                    <div style="color: {cor_ganho}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_ganho_cap}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                        Rentabilidade Comercial: <span style="color: {cor_rent}; font-weight:bold;">{"+" if rentabilidade_pct>=0 else ""}{rentabilidade_pct:.2f}%</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.divider()
+
+        # Tabela pura para conferência dos saldos
         st.subheader("Validação de Saldos Atuais")
         st.dataframe(df_final.style.format({
             'Quantidade': '{:.0f}',
