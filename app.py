@@ -35,7 +35,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO DOS DADOS (MÉTODO COLAB RESTAURADO COM VALORAÇÃO DE ÉPOCA)
+# PROCESSAMENTO DOS DADOS (CÁLCULO DE CUSTÓDIA HISTÓRICA E PREÇOS DE ÉPOCA)
 # ==============================================================================
 try:
     # IDs oficiais
@@ -91,7 +91,7 @@ try:
                     carteira[tk]['qtd'] = max(0.0, carteira[tk]['qtd'] - qtd)
                     carteira[tk]['custo'] = carteira[tk]['qtd'] * pm_atual
 
-    # Consolida os dados processados em DataFrame
+    # Consolida os dados processados em DataFrame para o momento atual
     linhas = []
     for tk, dados in carteira.items():
         if dados['qtd'] > 0:
@@ -101,11 +101,11 @@ try:
     df_consolidado = pd.DataFrame(linhas)
     
     if not df_consolidado.empty:
-        # 4. Cruzamento com dados de mercado (Inf_Ativos)
+        # 4. Cruzamento com dados de mercado atuais (Inf_Ativos)
         df_final = pd.merge(df_consolidado, df_inf[['Ticker', 'Preco_Atual', 'Seguimento', 'Classificacao', 'Tipo']], on='Ticker', how='left')
         df_final['Patrimônio Atual'] = df_final['Quantidade'] * df_final['Preco_Atual']
         
-        # --- CÁLCULO DOS VALORES GLOBAIS ---
+        # --- CÁLCULO DOS VALORES GLOBAIS ATUAIS ---
         patrimonio_total = df_final['Patrimônio Atual'].sum()
         total_investido = df_final['Total Investido Ativo'].sum()
         ganho_capital = patrimonio_total - total_investido
@@ -130,12 +130,13 @@ try:
         # Rentabilidade e Variação Absoluta
         rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
         
-        # --- RECONSTRUÇÃO HISTÓRICA COM PREÇOS REAIS MENSAIS DE ÉPOCA ---
+        # --- RECONSTRUÇÃO DA LINHA DO TEMPO HISTÓRICA FIEL (MÊS A MÊS) ---
         df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
         meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
         
         historico_patrimonio = []
         for am in meses_historicos:
+            # Filtra todas as operações ocorridas ATÉ o mês em análise
             df_ate_o_mes = df_trades[df_trades['AnoMes'] <= am]
             
             carteira_mes = {}
@@ -168,12 +169,14 @@ try:
                 if dados_m['qtd'] > 0:
                     inv_do_mes += dados_m['custo']
                     
-                    # Filtra movimentações com preço válido daquele ativo ATÉ o mês de referência
-                    df_preco_historico = df_ate_o_mes[(df_ate_o_mes['Ticker'] == t) & (df_ate_o_mes['Preço unitário'] > 0)]
-                    if not df_preco_historico.empty:
-                        # Pega o preço unitário da última operação que você fez naquele ativo até aquele mês
-                        preco_epoca = float(df_preco_historico.sort_values('Data').iloc[-1]['Preço unitário'])
+                    # CORREÇÃO CRÍTICA: Busca o último preço unitário conhecido do ativo ATÉ este mês, independente de quando foi o trade
+                    df_precos_passados = df_mov[(df_mov['Ticker'] == t) & (df_mov['Data'] <= am.to_timestamp(how='E')) & (df_mov['Preço unitário'] > 0)]
+                    
+                    if not df_precos_passados.empty:
+                        # Resgata o preço real mais próximo daquela época histórica
+                        preco_epoca = float(df_precos_passados.sort_values('Data').iloc[-1]['Preço unitário'])
                     else:
+                        # Se nunca houve preço preenchido antes, usa o preço atual de mercado como fallback único
                         preco_f = df_inf[df_inf['Ticker'] == t]['Preco_Atual'].values
                         preco_epoca = float(preco_f[0]) if len(preco_f) > 0 else 0.0
                         
@@ -188,7 +191,7 @@ try:
                 
         df_evolucao = pd.DataFrame(historico_patrimonio)
 
-        # --- ESTILIZAÇÃO DE STRINGS ---
+        # --- ESTILIZAÇÃO DE STRINGS MENSAGENS ---
         def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         
         str_patrimonio = formatar_br(patrimonio_total)
@@ -203,13 +206,13 @@ try:
         cor_rent = "#2E8B57" if rentabilidade_pct >= 0 else "#E74C3C"
 
         # ==============================================================================
-        # CRIAÇÃO DAS ABAS (NAVEGAÇÃO)
+        # CRIAÇÃO DAS ABAS (NAVEGAÇÃO DO DASHBOARD)
         # ==============================================================================
         st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
         aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
         
         with aba_resumo:
-            # Linha de KPIs (Trancados)
+            # Linha de KPIs (Totalmente Trancados e Intactos)
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -260,14 +263,14 @@ try:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ==============================================================================
-            # LINHA DE GRÁFICOS: 60% COMPARATIVO HISTÓRICO REAL | 40% ROSCA COM LEG PERCENTUAL
+            # LINHA DE GRÁFICOS: 60% COMPARATIVO REAL CORRIGIDO | 40% ROSCA COM LEG PERCENTUAL
             # ==============================================================================
             g_col1, g_col2 = st.columns([6, 4])
             
             with g_col1:
                 if not df_evolucao.empty:
                     fig_lin = go.Figure()
-                    # Linha do Valor de Mercado REAL calculado com o preço de cada respectivo mês
+                    # Linha do Valor de Mercado REAL calculado mês a mês com cotação de época retroativa persistente
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Patrimônio (Mercado)'],
@@ -277,7 +280,7 @@ try:
                         marker=dict(size=5),
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    # Linha do Total Investido (Custo de Aquisição)
+                    # Linha do Total Investido (Custo Histórico Acumulado)
                     fig_lin.add_trace(go.Scatter(
                         x=df_evolucao['Mês'], 
                         y=df_evolucao['Total Investido'],
@@ -292,13 +295,12 @@ try:
                         title_font=dict(size=14, color='#2C3E50'),
                         margin=dict(l=40, r=20, t=40, b=30),
                         height=400,
-                        hovermode='closest',
                         plot_bgcolor='rgba(0,0,0,0)',
                         paper_bgcolor='rgba(0,0,0,0)',
                         yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
-                    st.plotly_chart(fig_lin, width='stretch')
+                    st.plotly_chart(fig_lin, use_container_width=True)
                 else:
                     st.info("Dados de evolução histórica insuficientes.")
 
@@ -335,7 +337,7 @@ try:
                         font=dict(size=11)
                     )
                 )
-                st.plotly_chart(fig_pie, width='stretch')
+                st.plotly_chart(fig_pie, use_container_width=True)
 
         with aba_alocacao:
             st.info("Esta aba está pronta para receber o GPS de Rebalanceamento Estratégico nos próximos passos.")
