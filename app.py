@@ -36,34 +36,36 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# FUNÇÃO PARA BAINXAR COTAÇÕES HISTÓRICAS REAIS (YAHOO FINANCE)
+# FUNÇÃO CORRIGIDA PARA BAIXAR COTAÇÕES HISTÓRICAS REAIS (ATIVO POR ATIVO)
 # ==============================================================================
-@st.cache_data(ttl=86400)  # Guarda em cache por 24h para o painel abrir instantaneamente
+@st.cache_data(ttl=86400)  # Guarda em cache por 24h
 def buscar_fechamentos_historicos(tickers_list, data_minima):
-    dados_fechamento = {}
-    # Transforma os tickers da planilha para o formato do Yahoo Finance (.SA)
-    tickers_yf = [f"{tk}.SA" for tk in tickers_list if tk and tk != 'nan']
+    df_consolidado_precos = pd.DataFrame()
     
-    if not tickers_yf:
-        return dados_fechamento
-        
-    try:
-        # Baixa o histórico mensal desde o início das suas operações
-        df_hist = yf.download(tickers_yf, start=data_minima, interval="1mo")['Adj Close']
-        
-        # Se retornar apenas um ticker, o yfinance devolve uma Series. Forçamos DataFrame.
-        if isinstance(df_hist, pd.Series):
-            df_hist = df_hist.to_frame(name=tickers_yf[0])
+    for tk in tickers_list:
+        if not tk or str(tk) == 'nan' or tk == 'SPYI11':  # Ignora nulos ou ativos sem histórico padrão
+            continue
+        try:
+            # Baixa o histórico individual para evitar problemas de MultiIndex no cabeçalho
+            df_ticker = yf.download(f"{tk}.SA", start=data_minima, interval="1mo", progress=False)
             
-        # Converte o índice de tempo para formato Ano-Mês (Period) para cruzamento exato
-        df_hist.index = df_hist.index.to_period('M')
-        
-        # Limpa o nome das colunas removendo o '.SA' para bater com a planilha
-        df_hist.columns = [col.replace('.SA', '') for col in df_hist.columns]
-        return df_hist
-    except Exception as e:
-        st.warning(f"Aviso ao buscar cotações na internet: {e}")
-        return pd.DataFrame()
+            if not df_ticker.empty:
+                # Seleciona a primeira coluna de preço disponível de forma posicional (.iloc),
+                # eliminando a dependência do nome exato 'Adj Close' ou 'Close'
+                precos_serie = df_ticker.iloc[:, 0].copy()
+                
+                # Converte o índice de tempo para Ano-Mês
+                precos_serie.index = precos_serie.index.to_period('M')
+                
+                # Agrupa pelo índice para garantir que temos apenas um preço por mês (evitando duplicatas)
+                precos_serie = precos_serie.groupby(precos_serie.index).last()
+                
+                # Injeta a série histórica no DataFrame principal usando o Ticker como nome da coluna
+                df_consolidado_precos[tk] = precos_serie
+        except Exception:
+            pass # Avança de forma silenciosa caso algum ticker específico falhe na API
+            
+    return df_consolidado_precos
 
 # ==============================================================================
 # PROCESSAMENTO DOS DADOS DO DRIVE E CÁLCULO PATRIMONIAL
@@ -97,11 +99,11 @@ try:
     df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização'])].sort_values('Data').copy()
     df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
     
-    # Descobre a data inicial das suas operações e lista de tickers ativos na história
+    # Identifica parâmetros para a chamada da API
     data_inicio_string = df_trades['Data'].min().strftime('%Y-%m-%d') if not df_trades.empty else "2023-01-01"
     lista_todos_tickers = df_trades['Ticker'].dropna().unique().tolist()
     
-    # CHAMA A API DO YAHOO FINANCE COM O CAMINHO 1 REAL
+    # CHAMA A NOVA FUNÇÃO BLINDADA ATIVO POR ATIVO
     df_precos_historicos_b3 = buscar_fechamentos_historicos(lista_todos_tickers, data_inicio_string)
     
     carteira_corrente = {}
@@ -136,7 +138,7 @@ try:
                         carteira_corrente[tk]['qtd'] = max(0.0, carteira_corrente[tk]['qtd'] - qtd)
                         carteira_corrente[tk]['custo'] = carteira_corrente[tk]['qtd'] * pm_proporcional
                         
-        # VALORAÇÃO DE MERCADO HISTÓRICA REAL
+        # VALORAÇÃO DE MERCADO HISTÓRICA REAL DO MÊS COM PREÇOS DA API
         investido_no_mes = 0.0
         mercado_no_mes = 0.0
         
@@ -144,14 +146,13 @@ try:
             if dados['qtd'] > 0:
                 investido_no_mes += dados['custo']
                 
-                # Coleta o preço real do fechamento daquele mês na API do Yahoo Finance
                 preco_real_mes = 0.0
+                # Extrai o preço do índice do DataFrame consolidado de preços reais
                 if not df_precos_historicos_b3.empty and am in df_precos_historicos_b3.index:
                     if tk in df_precos_historicos_b3.columns:
                         preco_real_mes = float(df_precos_historicos_b3.loc[am, tk])
                 
-                # Se a API falhar para um ticker específico naquele mês (ou se for o SPYI11 sem histórico), 
-                # usa o preço médio de aquisição como fallback para manter a consistência do saldo
+                # Fallback de segurança: se o ativo não tiver histórico na data (ou for o SPYI11), usa o preço médio
                 if pd.isna(preco_real_mes) or preco_real_mes <= 0:
                     preco_real_mes = dados['custo'] / dados['qtd']
                     
@@ -268,14 +269,14 @@ try:
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ==============================================================================
-        # GRÁFICOS RECONSTRUÍDOS COM MAESTRIA (60% / 40%)
+        # GRÁFICOS RECONSTRUÍDOS COM MAESTRIA E PREÇOS REAIS DA API (60% / 40%)
         # ==============================================================================
         g_col1, g_col2 = st.columns([6, 4])
         
         with g_col1:
             if not df_evolucao.empty:
                 fig_lin = go.Figure()
-                # Linha do Valor de Mercado Real vinda da API de cotações históricas
+                # Linha do Valor de Mercado Real vinda da API de cotações históricas individuais
                 fig_lin.add_trace(go.Scatter(
                     x=df_evolucao['Mês'], 
                     y=df_evolucao['Valor de Mercado'],
