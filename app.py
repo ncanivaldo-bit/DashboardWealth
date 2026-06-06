@@ -151,13 +151,12 @@ try:
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         df_consolidado['Tipo'] = df_consolidado['Tipo'].fillna('OUTROS')
         
-        # Consolidação da Custódia de hoje (Utilizada de base para KPIs e Pizza)
+        # Consolidação da Custódia de hoje
         df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
         df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
         
-        # Valores brutos globais travados nos cards
         total_investido_kpi = float(df_custodia_atual['Custo_Total'].sum())
-        patrimonio_mercado_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
+        patrimonio_market_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
 
 except Exception as e:
     st.error(f"❌ Erro crítico no motor de cálculo: {e}")
@@ -176,7 +175,7 @@ with aba_resumo:
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
+                <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(patrimonio_market_kpi)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
                     Total Investido: <span style="color: #118DFF; font-weight:bold;">{formatar_br(total_investido_kpi)}</span>
                 </div>
@@ -189,37 +188,41 @@ with aba_resumo:
     with col4:
         st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold;">RENTABILIDADE</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">0.00%</div></div>""", unsafe_allow_html=True)
 
-    st.markdown("<br><hr style='margin: 10px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # 🏢 LINHA DE CONTROLADORES DE FILTRO
-    col_titulo_grafico, col_filtro_tempo, col_filtro_tipo = st.columns([2, 1, 1])
+    # 🏢 LINHA COMPACTA: TÍTULO DO GRÁFICO E FILTROS LADO A LADO (SEM RÓTULOS DETALHADOS)
+    col_titulo_grafico, col_filtro_tempo, col_filtro_tipo = st.columns([4, 3, 3])
+    
     with col_titulo_grafico:
-        st.markdown("<h3 style='margin-top:5px; padding:0; color:#2C3E50;'>Painel de Alocação</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin: 0; padding-top: 5px; color:#2C3E50; font-size: 22px;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
+        
     with col_filtro_tempo:
         anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
-        filtro_ano = st.selectbox("📅 Período (Gráfico Evolução)", options=anos_disponiveis, index=0)
+        # label_visibility="collapsed" remove o texto superior economizando espaço
+        filtro_ano = st.selectbox("Filtro Tempo", options=anos_disponiveis, index=0, label_visibility="collapsed")
+        
     with col_filtro_tipo:
         tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique()))
-        filtro_tipo = st.selectbox("💰 Tipo de Ativo (Gráfico Rosca)", options=tipos_disponiveis, index=0)
+        filtro_tipo = st.selectbox("Filtro Tipo", options=tipos_disponiveis, index=0, label_visibility="collapsed")
 
-    # Aplicação Isolada A: O filtro de Ano atua apenas na evolução temporal
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+    # Filtros aplicados isoladamente nas bases correspondentes
     df_filtrado_grafico = df_consolidado.copy()
     if filtro_ano != "Desde o início":
         df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
 
-    # Aplicação Isolada B: O filtro de Tipo atua EXCLUSIVAMENTE sobre a rosca de ativos de hoje
     df_rosca_filtrada = df_custodia_atual.copy()
     if filtro_tipo != "Todos os tipos":
         df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
 
-    # 🏁 LAYOUT DIVIDIDO EM 60% / 40% PARALELOS COM BORDAS ESTILO CARD
+    # 🏁 LAYOUT GRID DIVIDIDO EM 60% / 40%
     col_grafico_barra, col_grafico_rosca = st.columns([6, 4])
 
     with col_grafico_barra:
-        # Abertura da caixa visual com borda idêntica ao cartão
         st.markdown("""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #FFFFFF; box-shadow: 1px 1px 3px rgba(0,0,0,0.02);">
-                <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Evolução Histórica do Patrimônio</span>
+                <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Histórico de Alocação</span>
         """, unsafe_allow_html=True)
         
         if not df_filtrado_grafico.empty:
@@ -251,7 +254,7 @@ with aba_resumo:
             
             fig_barras.update_layout(
                 margin=dict(l=40, r=10, t=10, b=10),
-                height=310,  # 🎯 Achatamento do gráfico conforme solicitado
+                height=310,
                 barmode='relative',
                 bargap=0.2,
                 hovermode='x unified',
@@ -265,13 +268,12 @@ with aba_resumo:
         else:
             st.warning("⚠️ Sem dados cronológicos para os filtros.")
             
-        st.markdown("</div>", unsafe_allow_html=True) # Fechamento do card HTML
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col_grafico_rosca:
-        # Abertura da caixa visual com borda idêntica ao cartão
         st.markdown("""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #FFFFFF; box-shadow: 1px 1px 3px rgba(0,0,0,0.02);">
-                <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Distribuição Atual de Ativos</span>
+                <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Distribuição Atual por Ativo</span>
         """, unsafe_allow_html=True)
         
         if not df_rosca_filtrada.empty:
@@ -288,14 +290,14 @@ with aba_resumo:
                 labels=labels_legendas, 
                 values=df_rosca['Patrimonio_Mercado_Ativo'],
                 hole=0.55,
-                domain=dict(x=[0.05, 0.75]), # 🎯 Diminui o zoom da rosca empurrando o círculo para dentro
+                domain=dict(x=[0.05, 0.75]),
                 textinfo='none',
                 hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
             ))
             
             fig_pie.update_layout(
                 margin=dict(l=10, r=10, t=10, b=10),
-                height=310, # Alinha o tamanho das caixas na mesma altura do de barras
+                height=310,
                 paper_bgcolor='rgba(0,0,0,0)',
                 showlegend=True,
                 legend=dict(
@@ -303,7 +305,7 @@ with aba_resumo:
                     yanchor="middle", 
                     y=0.5, 
                     xanchor="left", 
-                    x=0.82,  # Encosta a legenda mais perto do círculo pelo zoom reduzido
+                    x=0.82,
                     font=dict(size=11)
                 )
             )
@@ -311,7 +313,7 @@ with aba_resumo:
         else:
             st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
             
-        st.markdown("</div>", unsafe_allow_html=True) # Fechamento do card HTML
+        st.markdown("</div>", unsafe_allow_html=True)
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
