@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import json
 import io
+import time
+import plotly.graph_objects as go
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -15,7 +17,7 @@ st.title("PREVPRIV")
 st.markdown("<p style='margin-bottom: -10px; font-size: 16px;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
 
 # ==============================================================================
-# CONEXÃO COM A NOVA PLANILHA UNIFICADA DO GOOGLE DRIVE
+# CONEXÃO DIRETA COM O GOOGLE DRIVE (Com proteção de Retry)
 # ==============================================================================
 @st.cache_resource
 def get_drive_service():
@@ -31,41 +33,122 @@ def download_excel_from_drive(file_id, sheet_name=0):
         fileId=file_id, 
         mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while done is False:
-        status, done = downloader.next_chunk()
-    fh.seek(0)
-    return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
+    
+    # Sistema de proteção contra oscilações de rede/SSL
+    for tentativa in range(3):
+        try:
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+            fh.seek(0)
+            return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
+        except Exception as e:
+            if tentativa == 2:
+                raise e
+            time.sleep(1)
 
 # ==============================================================================
-# CARGA INICIAL DAS ABAS UNIFICADAS
+# MOTOR DE PROCESSAMENTO - EVOLUÇÃO DO VALOR INVESTIDO
 # ==============================================================================
+df_portfolio_mensal = pd.DataFrame()
+total_investido_kpi = 0.0
+
 try:
-    # Seu novo ID centralizador do Google Sheets
+    # ID unificado oficial da sua planilha do Google
     ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
     
-    # Leitura direta das respectivas abas pelo nome exato
+    # Carrega a aba de movimentações
     df_mov = download_excel_from_drive(ID_UNIFICADO, sheet_name='Movimentacao')
-    df_inf = download_excel_from_drive(ID_UNIFICADO, sheet_name='Inf_Ativos')
-    df_precos_historicos = download_excel_from_drive(ID_UNIFICADO, sheet_name='Hist_Precos')
-    
-    # Limpeza preventiva de cabeçalhos
     df_mov.columns = df_mov.columns.astype(str).str.strip()
-    df_inf.columns = df_inf.columns.astype(str).str.strip()
-    df_precos_historicos.columns = df_precos_historicos.columns.astype(str).str.strip()
+    
+    # 1. Padronização e Limpeza de Tickers
+    df_mov['Ticker'] = df_mov['Ticker'].astype(str).str.strip()
+    conversao_tickers = {"MALL11": "PMLL11", "CVBI11": "PCIP11"}
+    df_mov['Ticker'] = df_mov['Ticker'].replace(conversao_tickers)
+    
+    # 2. Tratamento de tipos de dados
+    df_mov['Quantidade_Num'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
+    df_mov['Valor_Operacao_Num'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
+    df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%Y-%m-%d', errors='coerce')
+    
+    # Se a data falhar no formato YYYY-MM-DD (comum após virar Google Sheets), tenta o formato BR
+    if df_mov['Data_Datetime'].isna().all():
+        df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
+
+    # 3. Filtro focado estritamente em Renda Variável (Bolsa)
+    eventos_custodia = ['Compra', 'Venda', 'Desdobro']
+    df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
+    
+    # 4. Algoritmo de Acúmulo Cronológico de Custo LÍQUIDO
+    carteira = {}
+    historico_financeiro = []
+    
+    for _, row in df_trades.iterrows():
+        ticker = row['Ticker']
+        data = row['Data_Datetime']
+        mov = row['Movimentação']
+        tipo = str(row['Entrada/Saída']).strip()
+        qtd = float(row['Quantidade_Num'])
+        valor = float(row['Valor_Operacao_Num'])
+        
+        if pd.isna(data):
+            continue
+            
+        if ticker not in carteira:
+            carteira[ticker] = {'quantidade': 0.0, 'custo_total': 0.0, 'preco_medio': 0.0}
+            
+        if mov == 'Compra':
+            carteira[ticker]['quantidade'] += qtd
+            carteira[ticker]['custo_total'] += valor
+        elif mov == 'Venda':
+            if carteira[ticker]['quantidade'] > 0:
+                # Abate o custo com base no preço médio real antes da venda
+                qtd_venda = min(qtd, carteira[ticker]['quantidade'])
+                carteira[ticker]['custo_total'] -= qtd_venda * carteira[ticker]['preco_medio']
+            carteira[ticker]['quantidade'] -= qtd
+        elif mov == 'Desdobro':
+            # Recebe novas cotas gratuitas, diluindo o preço médio sem alterar o custo total
+            carteira[ticker]['quantidade'] += qtd
+            
+        # Atualiza o preço médio do ativo para a próxima operação
+        if carteira[ticker]['quantidade'] > 0:
+            carteira[ticker]['preco_medio'] = carteira[ticker]['custo_total'] / carteira[ticker]['quantidade']
+        else:
+            carteira[ticker]['quantidade'] = 0.0
+            carteira[ticker]['custo_total'] = 0.0
+            carteira[ticker]['preco_medio'] = 0.0
+            
+        # Salva o estado da foto financeira geral naquele momento
+        historico_financeiro.append({
+            'Data': data,
+            'Custo_Acumulado': sum(d['custo_total'] for d in carteira.values())
+        })
+        
+    # 5. Agrupamento pelo fechamento de cada mês para o gráfico
+    df_hist = pd.DataFrame(historico_financeiro)
+    if not df_hist.empty:
+        df_hist['AnoMes'] = df_hist['Data'].dt.to_period('M')
+        df_portfolio_mensal = df_hist.groupby('AnoMes').last().reset_index()
+        df_portfolio_mensal['Mês_Exibição'] = df_portfolio_mensal['AnoMes'].dt.strftime('%m/%Y')
+        
+        # Alimenta o valor atualizado no cartão de KPI
+        total_investido_kpi = float(df_portfolio_mensal.iloc[-1]['Custo_Acumulado'])
 
 except Exception as e:
-    st.error(f"❌ Erro ao ler a nova planilha unificada: {e}")
+    st.error(f"❌ Erro no processamento do motor gráfico: {e}")
 
 # ==============================================================================
-# RENDERIZAÇÃO DA INTERFACE VISUAL (Estrutura Pronta)
+# RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
 st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
+    # Formatação Padrão BR
+    str_investido = f"R$ {total_investido_kpi:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -74,7 +157,7 @@ with aba_resumo:
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
                 <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">R$ 0,00</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                    Total Investido: <span style="color: #34495E; font-weight:bold;">R$ 0,00</span>
+                    Total Investido: <span style="color: #118DFF; font-weight:bold;">{str_investido}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -114,7 +197,35 @@ with aba_resumo:
         """, unsafe_allow_html=True)
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.info("📊 Conexão com o novo arquivo unificado estabelecida com sucesso. Aguardando próximas instruções.")
+
+    # IMPRESSÃO DO GRÁFICO DE EVOLUÇÃO PATRIMONIAL DO INVESTIDO
+    if not df_portfolio_mensal.empty:
+        fig_evolucao = go.Figure()
+        fig_evolucao.add_trace(go.Scatter(
+            x=df_portfolio_mensal['Mês_Exibição'], 
+            y=df_portfolio_mensal['Custo_Acumulado'],
+            mode='lines+markers',
+            name='Total Investido (Renda Variável)',
+            line=dict(color='#118DFF', width=3),
+            marker=dict(size=6),
+            hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
+        ))
+        
+        fig_evolucao.update_layout(
+            title="<b>Evolução Histórica do Capital Investido (Ações e FIIs)</b>",
+            title_font=dict(size=15, color='#2C3E50'),
+            margin=dict(l=50, r=30, t=50, b=40),
+            height=400,
+            hovermode='x unified',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
+            xaxis=dict(gridcolor='rgba(230,235,240,0.3)', type='category'),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_evolucao, use_container_width=True)
+    else:
+        st.info("ℹ️ Aguardando dados das transações para plotagem.")
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
