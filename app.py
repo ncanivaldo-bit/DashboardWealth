@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 FORÇANDO O ACESSAMENTO DO TOPO VIA IDENTIFICADOR INTERNO DO STREAMLIT
+# 🎯 INJEÇÃO CSS PARA ELIMINAR O TOPO, RECUOS INÚTEIS E ESPAÇAMENTOS ENTRE ELEMENTOS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -26,20 +26,32 @@ st.markdown("""
             padding-bottom: 1rem !important;
         }
         
-        /* 3. Oculta os menus e botões da plataforma */
+        /* 3. Comprime o espaço vertical entre blocos e linhas do Streamlit */
+        [data-testid="stVerticalBlock"] {
+            gap: 0.5rem !important;
+        }
+        
+        /* 4. Ajusta a margem do título principal */
+        h1 { 
+            margin-top: -5px !important; 
+            margin-bottom: 5px !important; 
+            font-size: 26px !important; 
+            font-weight: 700 !important;
+        }
+        
+        /* 5. Oculta os menus e botões da plataforma */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
         
-        /* 4. Esconde o ícone do GitHub no canto superior direito */
+        /* 6. Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("PREVPRIV")
-st.markdown("<p style='margin-bottom: -10px; font-size: 16px;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
 
 # ==============================================================================
 # CONEXÃO DIRETA COM O GOOGLE DRIVE (Com proteção de Retry)
@@ -195,10 +207,9 @@ def carregar_e_processar_dados_carteira():
         return df_consolidado, df_custodia_atual, total_dividendos_historico, ultimo_provento_valor, ultimo_provento_mes_ano
     return pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
 
-# Execução do Motor de Inteligência
+# Execução do Motor de Raciocínio
 df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = carregar_e_processar_dados_carteira()
 
-# Inicialização padrão de variáveis matemáticas
 total_investido_kpi = 0.0
 patrimonio_mercado_kpi = 0.0
 ganho_capital_kpi = 0.0
@@ -220,7 +231,6 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -291,10 +301,11 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<br><hr style='margin: 10px 0; border-color: #ECEFF1;'><br>", unsafe_allow_html=True)
+    # 🎯 Removido o espaçador <br> daqui e ajustada a linha divisória com margens mínimas para colar os blocos
+    st.markdown("<hr style='margin: 4px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
     # ==============================================================================
-    # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
+    # BLOCOS GRÁFICOS PARALELOS (60% / 40%) - ENQUADRAMENTO COMPACTADO NATAL
     # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
@@ -336,74 +347,4 @@ with aba_resumo:
                     y=df_totais_mensais['Ganho_de_Capital'],
                     name='Ganho de Capital',
                     marker_color='#7ee0b3',
-                    hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
-                ))
-                
-                fig_barras.update_layout(
-                    margin=dict(l=40, r=10, t=10, b=10),
-                    height=310,
-                    barmode='relative',
-                    bargap=0.2,
-                    hovermode='x unified',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
-                    xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
-                )
-                st.plotly_chart(fig_barras, use_container_width=True)
-
-    with col_bloco_direito:
-        with st.container(border=True):
-            col_t2, col_f2 = st.columns([6, 4])
-            with col_t2:
-                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
-            with col_f2:
-                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
-                filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
-                
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-
-            df_rosca_filtrada = df_custodia_atual.copy()
-            if filtro_tipo != "Todos os tipos" and not df_rosca_filtrada.empty:
-                df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
-
-            if not df_rosca_filtrada.empty:
-                df_rosca = df_rosca_filtrada.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
-                
-                labels_legendas = []
-                total_mercado_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
-                for _, row_r in df_rosca.iterrows():
-                    pct = (row_r['Patrimonio_Mercado_Ativo'] / total_mercado_rosca) * 100 if total_mercado_rosca > 0 else 0.0
-                    labels_legendas.append(f"<b>{row_r['Ticker']}</b> ({pct:.1f}%)")
-                
-                fig_pie = go.Figure()
-                fig_pie.add_trace(go.Pie(
-                    labels=labels_legendas, 
-                    values=df_rosca['Patrimonio_Mercado_Ativo'],
-                    hole=0.55,
-                    domain=dict(x=[0.0, 0.65]),
-                    textinfo='none',
-                    hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
-                ))
-                
-                fig_pie.update_layout(
-                    margin=dict(l=0, r=0, t=10, b=10),
-                    height=280,
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    showlegend=True,
-                    legend=dict(
-                        orientation="v", 
-                        yanchor="middle", 
-                        y=0.5, 
-                        xanchor="left", 
-                        x=0.68,
-                        font=dict(size=10)
-                    )
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
-
-with aba_alocacao:
-    st.info("⚙️ Aba de alocação estruturada.")
+                    hovertemplate='<b>Ganho Cap:</b> R$ %{
