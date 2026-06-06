@@ -13,6 +13,20 @@ from googleapiclient.http import MediaIoBaseDownload
 # CONFIGURAÇÃO DE TELA E IDENTIDADE VISUAL
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
+
+# 🎯 INJEÇÃO CSS PARA ESCONDER O ÍCONE DO GITHUB E MENUS DE CONFIGURAÇÃO DO STREAMLIT
+st.markdown("""
+    <style>
+        /* Esconde o ícone do GitHub no canto superior direito */
+        .viewerBadge_link__1S137 { display: none !important; }
+        a.viewerBadge_link__1S137 { display: none !important; }
+        #MainMenu { visibility: hidden; }
+        footer { visibility: hidden; }
+        header { visibility: hidden; }
+        .stDeployButton { display: none !important; }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("PREVPRIV")
 st.markdown("<p style='margin-bottom: -10px; font-size: 16px;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
 
@@ -80,7 +94,6 @@ def carregar_e_processar_dados_carteira():
     df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
     df_precos_historicos['Chave_Merge'] = df_precos_historicos['Chave_Merge'].astype(str).str.strip()
 
-    # 1. Isolamento e Cálculo Cronológico de Custódia
     eventos_custodia = ['Compra', 'Venda', 'Desdobro']
     df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
     
@@ -126,12 +139,10 @@ def carregar_e_processar_dados_carteira():
                 'Custo_Total': dados['custo_total']
             })
             
-    # 2. Extração de Dividendos Totais e Cálculo do Último Mês Pago
     termos_proventos = ['Dividendo', 'JCP', 'Rendimento', 'Provento']
     df_proventos = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     total_dividendos_historico = float(df_proventos['Valor da Operação'].sum())
     
-    # Processamento para descobrir o último mês de proventos consolidados
     ultimo_provento_valor = 0.0
     ultimo_provento_mes_ano = "-"
     if not df_proventos.empty and not df_proventos['Data_Datetime'].isna().all():
@@ -188,14 +199,11 @@ if not df_custodia_atual.empty:
     total_investido_kpi = float(df_custodia_atual['Custo_Total'].sum())
     patrimonio_mercado_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
     
-    # Cálculos Avançados das Métricas
     ganho_capital_kpi = patrimonio_mercado_kpi - total_investido_kpi
     lucro_total_kpi = ganho_capital_kpi + total_dividendos
     
     if total_investido_kpi > 0:
-        # Variação Patrimonial pura (Preço Médio vs Preço Atual)
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
-        # Rentabilidade Estratégica incluindo a Alavanca dos Dividendos (Retorno Total)
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
 # ==============================================================================
@@ -205,7 +213,6 @@ st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
-    # Formatações Padrão de Moeda e Sinais BR
     def formatar_br(v):
         prefixo = "-" if v < 0 else ""
         return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -214,7 +221,6 @@ with aba_resumo:
         prefixo = "+" if v > 0 else ""
         return f"{prefixo}{v:.2f}%".replace('.', ',')
 
-    # Determinação das cores condicionais dinâmicas (Verde se >= 0, Vermelho se < 0)
     color_lucro = "#2E8B57" if lucro_total_kpi >= 0 else "#CD5C5C"
     color_ganho = "#2E8B57" if ganho_capital_kpi >= 0 else "#CD5C5C"
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
@@ -223,7 +229,6 @@ with aba_resumo:
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # 🎯 CARD 1: PATRIMÔNIO ATUAL (Com acréscimo da variação colorida no rodapé)
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
@@ -236,7 +241,6 @@ with aba_resumo:
         """, unsafe_allow_html=True)
         
     with col2:
-        # 🎯 CARD 2: LUCRO TOTAL
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
@@ -255,7 +259,6 @@ with aba_resumo:
         """, unsafe_allow_html=True)
         
     with col3:
-        # 🎯 CARD 3: ÚLTIMO PROVENTO MENSAL
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
@@ -267,7 +270,6 @@ with aba_resumo:
         """, unsafe_allow_html=True)
         
     with col4:
-        # 🎯 CARD 4: VARIAÇÃO E RENTABILIDADE (Retorno Estratégico Total da Carteira)
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
