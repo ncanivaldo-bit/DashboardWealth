@@ -14,19 +14,19 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA CASAMENTO PERFEITO NA LARGURA DA TELA E COMPRESSÃO DOS CARTÕES
+# 🎯 INJEÇÃO CSS PARA FULL-WIDTH, COMPRESSÃO E SIMETRIA DOS CARDS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
         
-        /* 2. Zera o recuo superior e FORÇA O PREENCHIMENTO TOTAL DA LARGURA DA TELA (Full Width) */
+        /* 2. Zera o recuo superior e força o preenchimento total da largura da tela (Full Width) */
         [data-testid="stMainBlockContainer"] {
             padding-top: 1rem !important;
             padding-bottom: 1rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
-            max-width: 100% !important; /* Estica o painel de ponta a ponta na horizontal */
+            max-width: 100% !important;
         }
         
         /* 3. Comprime o espaço vertical entre blocos e linhas do Streamlit */
@@ -254,12 +254,12 @@ with aba_resumo:
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # 🎯 CARD 1 COMPACTADO (min-height reduzido para 110px e padding reduzido para 10px)
+        # 🎯 CARD 1 - Corrigida a assimetria removendo o align-items centralizado do rodapé
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
                 <div style="color: #2C3E50; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(patrimonio_mercado_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <span>Total Investido: <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong></span>
                     <span>Var: <strong style="color: {color_var}; font-size: 11.5px;">{formatar_pct(variacao_carteira_pct)}</strong></span>
                 </div>
@@ -267,7 +267,6 @@ with aba_resumo:
         """, unsafe_allow_html=True)
         
     with col2:
-        # 🎯 CARD 2 COMPACTADO
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
@@ -286,33 +285,32 @@ with aba_resumo:
         """, unsafe_allow_html=True)
         
     with col3:
-        # 🎯 CARD 3 COMPACTADO
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
                 <div style="color: #2E8B57; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(ult_provento_val)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D;">
-                    Mês de Referência: <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                    <span>Mês de Referência:</span> <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col4:
-        # 🎯 CARD 4 COMPACTADO
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
                 <div style="color: {color_rent}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_pct(rentabilidade_total_pct)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D;">
-                    Resultado Comercial: <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                    <span>Resultado Comercial:</span> <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin: 4px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+    # 🎯 Ajustado o espaçamento inferior (margin-bottom: 12px) para empurrar os gráficos levemente para baixo
+    st.markdown("<hr style='margin: 4px 0 12px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
     # ==============================================================================
-    # BLOCOS GRÁFICOS PARALELOS (60% / 40%) - ESTICADOS NA LARGURA TOTAL
+    # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
     # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
