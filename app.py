@@ -162,7 +162,7 @@ except Exception as e:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -186,13 +186,13 @@ with aba_resumo:
     with col4:
         st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold;">RENTABILIDADE</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">0.00%</div></div>""", unsafe_allow_html=True)
 
-    st.markdown("<br><hr style='margin: 10px 0; border-color: #ECEFF1;'><br>", unsafe_allow_html=True)
+    # Reduzi a margem da linha divisória para comprimir o espaço vertical
+    st.markdown("<hr style='margin: 5px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
-    # 🏁 LAYOUT GRID DIVIDIDO EM 60% / 40%
+    # 🏢 LINHA DE CONTROLADORES DE FILTRO (Margem reduzida para colar nos gráficos)
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
     with col_bloco_esquerdo:
-        # 🎯 O st.container(border=True) cria a borda suave contornando todo o conjunto (título + filtro + gráfico)
         with st.container(border=True):
             col_t1, col_f1 = st.columns([7, 3])
             with col_t1:
@@ -201,7 +201,7 @@ with aba_resumo:
                 anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
                 filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
             df_filtrado_grafico = df_consolidado.copy()
             if filtro_ano != "Desde o início":
@@ -235,7 +235,7 @@ with aba_resumo:
                 
                 fig_barras.update_layout(
                     margin=dict(l=35, r=5, t=10, b=10),
-                    height=280, # Leve ajuste para compensar o respiro interno da borda nativa
+                    height=280,
                     barmode='relative',
                     bargap=0.2,
                     hovermode='x unified',
@@ -248,7 +248,6 @@ with aba_resumo:
                 st.plotly_chart(fig_barras, use_container_width=True)
 
     with col_bloco_direito:
-        # 🎯 O mesmo st.container(border=True) envelopando a rosca de ativos com o contorno suave
         with st.container(border=True):
             col_t2, col_f2 = st.columns([6, 4])
             with col_t2:
@@ -257,7 +256,7 @@ with aba_resumo:
                 tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique()))
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
             df_rosca_filtrada = df_custodia_atual.copy()
             if filtro_tipo != "Todos os tipos":
@@ -284,7 +283,7 @@ with aba_resumo:
                 
                 fig_pie.update_layout(
                     margin=dict(l=0, r=0, t=10, b=10),
-                    height=280, # Alinhado simetricamente com a mesma altura das barras
+                    height=280,
                     paper_bgcolor='rgba(0,0,0,0)',
                     showlegend=True,
                     legend=dict(
