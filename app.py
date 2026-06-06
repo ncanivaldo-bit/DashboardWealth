@@ -26,13 +26,10 @@ def get_drive_service():
 
 def download_excel_from_drive(file_id, sheet_name=0):
     service = get_drive_service()
-    
-    # Exportação estável de arquivos nativos Google Sheets
     request = service.files().export_media(
         fileId=file_id, 
         mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    
     fh = io.BytesIO()
     downloader = MediaIoBaseDownload(fh, request)
     done = False
@@ -45,37 +42,49 @@ def download_excel_from_drive(file_id, sheet_name=0):
 # PROCESSAMENTO DOS DADOS - MOTOR PREVPRIV
 # ==============================================================================
 try:
-    # 📝 SEUS IDS REAIS E OFICIAIS DO GOOGLE SHEETS
-    ID_MOV = '1JJPFCTWORXmTBJB3KdtKK-LRf-3A8XIAESWRiOX-G4E' # Planilha Movimentação CORRETA
-    ID_INF = '1FcBDlaArTQrkYdmDFbqbwObl5qmPy8K2sxxiE0RE8QE' # Planilha Inf_Ativos
+    ID_MOV = '1JJPFCTWORXmTBJB3KdtKK-LRf-3A8XIAESWRiOX-G4E' # Movimentação
+    ID_INF = '1FcBDlaArTQrkYdmDFbqbwObl5qmPy8K2sxxiE0RE8QE' # Inf_Ativos
     
-    # 1. Carrega a primeira aba de cada arquivo correspondente
+    # 1. Carrega as tabelas brutas
     df_mov = download_excel_from_drive(ID_MOV, sheet_name=0) 
     df_inf = download_excel_from_drive(ID_INF, sheet_name=0) 
     df_precos_historicos = download_excel_from_drive(ID_INF, sheet_name='Hist_Precos')
     
-    # Limpeza de cabeçalhos contra espaços fantasmas
+    # --- AUTO-DETECÇÃO DE CABEÇALHO REAL (Evita linhas em branco ou lixo no topo) ---
+    for i in range(min(5, len(df_mov))):
+        colunas_teste = [str(c).strip().lower() for c in df_mov.columns]
+        if 'data' in colunas_teste or 'movimentação' in colunas_teste or 'produto' in colunas_teste:
+            break # Encontrou o cabeçalho real na linha correta!
+        # Se não encontrou, promove a primeira linha a cabeçalho e tenta de novo
+        df_mov.columns = df_mov.iloc[0].astype(str).str.strip()
+        df_mov = df_mov[1:].reset_index(drop=True)
+
+    # Limpeza final de cabeçalhos
     df_mov.columns = df_mov.columns.astype(str).str.strip()
     df_inf.columns = df_inf.columns.astype(str).str.strip()
     df_precos_historicos.columns = df_precos_historicos.columns.astype(str).str.strip()
     
-    # Identificação inteligente e tolerante de colunas críticas
-    col_data = [c for c in df_mov.columns if c.lower() == 'data'][0]
-    col_movimentacao = [c for c in df_mov.columns if 'movimentac' in c.lower()][0]
-    col_produto = [c for c in df_mov.columns if 'produto' in c.lower()][0]
-    col_quantidade = [c for c in df_mov.columns if 'quantidad' in c.lower()][0]
-    col_valor = [c for c in df_mov.columns if 'valor' in c.lower()][0]
-    col_sentido = [c for c in df_mov.columns if 'entrada' in c.lower() or 'saida' in c.lower()][0]
+    # Verificação de emergência: se falhar o mapeamento, joga as colunas na tela em vez de quebrar tudo
+    try:
+        col_data = [c for c in df_mov.columns if c.lower() == 'data'][0]
+        col_movimentacao = [c for c in df_mov.columns if 'movimentac' in c.lower()][0]
+        col_produto = [c for c in df_mov.columns if 'produto' in c.lower()][0]
+        col_quantidade = [c for c in df_mov.columns if 'quantidad' in c.lower()][0]
+        col_valor = [c for c in df_mov.columns if 'valor' in c.lower()][0]
+        col_sentido = [c for c in df_mov.columns if 'entrada' in c.lower() or 'saida' in c.lower()][0]
+    except IndexError:
+        st.error("⚠️ Não foi possível mapear as colunas padrão de Movimentação automaticamente.")
+        st.write("As colunas interpretadas pelo Python foram:", list(df_mov.columns))
+        st.write("Confira as primeiras linhas extraídas:", df_mov.head(3))
+        st.stop()
 
     # 2. Tratamento de Datas e Extração do Ticker básico
     df_mov['Data_Datetime'] = pd.to_datetime(df_mov[col_data], format='%d/%m/%Y', errors='coerce')
     df_mov['Ticker'] = df_mov[col_produto].astype(str).str.split(' - ').str[0].str.strip()
     
-    # Unifica as mudanças históricas de Ticker (MALL e CVBI)
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
-    # Força conversão numérica segura contra strings inválidas
     df_mov['Quantidade_Num'] = pd.to_numeric(df_mov[col_quantidade], errors='coerce').fillna(0)
     df_mov['Valor_Num'] = pd.to_numeric(df_mov[col_valor], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
@@ -128,7 +137,6 @@ try:
                 'Preco_Medio': dados['preco_medio']
             })
             
-    # Agrupamento mensal resampled por fim de mês ('ME')
     df_hist_ativos = pd.DataFrame(historico_detalhado)
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
@@ -142,7 +150,6 @@ try:
                             .reset_index())
         
         df_mensal_ativos.loc[df_mensal_ativos['Quantidade'] <= 0, 'Custo_Total'] = 0.0
-        
         df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
         df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
         
@@ -183,7 +190,7 @@ try:
     df_final = pd.merge(df_final, df_inf[['Ticker', 'Preco_Atual', 'Seguimento', 'Classificacao', 'Tipo']], on='Ticker', how='left')
     df_final['Patrimônio Atual'] = df_final['Quantidade'] * df_final['Preco_Atual']
 
-    # Indicadores absolutos trancados nos cards
+    # Indicadores absolutos nos cards
     patrimonio_total = df_final['Patrimônio Atual'].sum()
     total_investido = df_final['Total Investido Ativo'].sum()
     ganho_capital = patrimonio_total - total_investido
