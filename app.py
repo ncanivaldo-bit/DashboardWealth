@@ -48,16 +48,11 @@ def download_excel_from_drive(file_id, sheet_name=0):
             time.sleep(1)
 
 # ==============================================================================
-# MOTOR MATRICIAL - INVESTIDO VS MERCADO HISTÓRICO
+# MOTOR MATRICIAL - PROCESSAMENTO INTEGRADO DE DADOS
 # ==============================================================================
-df_portfolio_mensal = pd.DataFrame()
-total_investido_kpi = 0.0
-patrimonio_mercado_kpi = 0.0
-
 try:
     ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
     
-    # 1. Downloads das abas do ecossistema unificado
     df_mov = download_excel_from_drive(ID_UNIFICADO, sheet_name='Movimentacao')
     df_inf = download_excel_from_drive(ID_UNIFICADO, sheet_name='Inf_Ativos')
     df_precos_historicos = download_excel_from_drive(ID_UNIFICADO, sheet_name='Hist_Precos')
@@ -66,7 +61,6 @@ try:
     df_inf.columns = df_inf.columns.astype(str).str.strip()
     df_precos_historicos.columns = df_precos_historicos.columns.astype(str).str.strip()
     
-    # 2. Padronização e Limpeza de chaves de cruzamento
     df_mov['Ticker'] = df_mov['Ticker'].astype(str).str.strip()
     df_inf['Ticker'] = df_inf['Ticker'].astype(str).str.strip()
     df_precos_historicos['Ticker'] = df_precos_historicos['Ticker'].astype(str).str.strip()
@@ -85,7 +79,7 @@ try:
     df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
     df_precos_historicos['Chave_Merge'] = df_precos_historicos['Chave_Merge'].astype(str).str.strip()
 
-    # 3. Processamento Cronológico Passo a Passo das Cotas e Custos
+    # Processamento de Custódia e Saldos
     eventos_custodia = ['Compra', 'Venda', 'Desdobro']
     df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
     
@@ -131,7 +125,6 @@ try:
                 'Custo_Total': dados['custo_total']
             })
             
-    # 4. Construção da Malha Mensal Resampled
     df_hist_ativos = pd.DataFrame(historico_detalhado)
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
@@ -146,31 +139,27 @@ try:
         df_mensal_ativos.loc[df_mensal_ativos['Quantidade'] <= 0, 'Custo_Total'] = 0.0
         df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
         df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
+        df_mensal_ativos['Ano_Str'] = df_mensal_ativos['Data'].dt.strftime('%Y')
         
-        # 5. Cruzamento Matricial com o Histórico de Preços da B3
         df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
+        df_consolidado = pd.merge(df_consolidado, df_inf[['Ticker', 'Preco_Atual', 'Tipo']], on='Ticker', how='left')
         
-        # Injeta o preço em tempo real da Inf_Ativos no mês corrente (Junho 2026)
-        df_consolidado = pd.merge(df_consolidado, df_inf[['Ticker', 'Preco_Atual']], on='Ticker', how='left')
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
         
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
+        df_consolidado['Tipo'] = df_consolidado['Tipo'].fillna('OUTROS')
         
-        # Consolidação Final Agrupada por Mês
-        df_portfolio_mensal = df_consolidado.groupby('Mes_Ano').agg({
-            'Custo_Total': 'sum',
-            'Patrimonio_Mercado_Ativo': 'sum'
-        }).reset_index().sort_values('Mes_Ano')
+        # Consolidação da Foto de Custódia Atual para alimentar os KPIs e a Rosca
+        df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
+        df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
         
-        df_portfolio_mensal['Mês_Exibição'] = df_portfolio_mensal['Mes_Ano'].dt.strftime('%m/%Y')
-        
-        total_investido_kpi = float(df_portfolio_mensal.iloc[-1]['Custo_Total'])
-        patrimonio_mercado_kpi = float(df_portfolio_mensal.iloc[-1]['Patrimonio_Mercado_Ativo'])
+        total_investido_kpi = float(df_custodia_atual['Custo_Total'].sum())
+        patrimonio_mercado_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
 
 except Exception as e:
-    st.error(f"❌ Erro no cruzamento matricial de dados: {e}")
+    st.error(f"❌ Erro crítico no motor de cálculo: {e}")
 
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
@@ -180,98 +169,134 @@ aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
     def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    str_investido = formatar_br(total_investido_kpi)
-    str_patrimonio = formatar_br(patrimonio_mercado_kpi)
     
     col1, col2, col3, col4 = st.columns(4)
-    
     with col1:
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{str_patrimonio}</div>
+                <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                    Total Investido: <span style="color: #118DFF; font-weight:bold;">{str_investido}</span>
+                    Total Investido: <span style="color: #118DFF; font-weight:bold;">{formatar_br(total_investido_kpi)}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
-
     with col2:
-        st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro Total</span>
-                <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">R$ 0,00</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                    <span>Ganho Cap: <strong style="color:#2E8B57;">R$ 0,00</strong></span>
-                    <span>Proventos: <strong style="color:#2E8B57;">R$ 0,00</strong></span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold;">LUCRO TOTAL</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">R$ 0,00</div></div>""", unsafe_allow_html=True)
     with col3:
-        st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
-                <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">R$ 0,00</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                    Mês Ref: <span style="color: #34495E; font-weight:bold;">-</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold;">ÚLTIMO PROVENTO</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">R$ 0,00</div></div>""", unsafe_allow_html=True)
     with col4:
-        st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Variação e Rentabilidade</span>
-                <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">R$ 0,00</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                    Rentabilidade: <span style="color: #2E8B57; font-weight:bold;">0.00%</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold;">RENTABILIDADE</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">0.00%</div></div>""", unsafe_allow_html=True)
 
-    # 📊 RENDERIZAÇÃO DO GRÁFICO EM BARRAS AGRUPADAS (MERCADO VS INVESTIDO)
-    if not df_portfolio_mensal.empty:
-        fig_evolucao = go.Figure()
-        
-        # Barra 1: Valor de Mercado (Verde)
-        fig_evolucao.add_trace(go.Bar(
-            x=df_portfolio_mensal['Mês_Exibição'], 
-            y=df_portfolio_mensal['Patrimonio_Mercado_Ativo'],
-            name='Valor de Mercado Real B3',
-            marker_color='#2E8B57',
-            hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
-        ))
-        
-        # Barra 2: Total Investido (Azul)
-        fig_evolucao.add_trace(go.Bar(
-            x=df_portfolio_mensal['Mês_Exibição'], 
-            y=df_portfolio_mensal['Custo_Total'],
-            name='Total Investido (Bolso)',
-            marker_color='#118DFF',
-            hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
-        ))
-        
-        fig_evolucao.update_layout(
-            title="<b>Evolução Patrimonial: Investido vs Mercado Real B3</b>",
-            title_font=dict(size=15, color='#2C3E50'),
-            margin=dict(l=50, r=30, t=50, b=40),
-            height=400,
-            barmode='group',  # Garante que as barras fiquem lado a lado por mês
-            bargap=0.15,       # Espaçamento entre os blocos de meses
-            bargroupgap=0.05,  # Espaçamento interno entre a barra verde e azul
-            hovermode='x unified',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
-            xaxis=dict(gridcolor='rgba(230,235,240,0.3)', type='category'),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-        st.plotly_chart(fig_evolucao, use_container_width=True)
-    else:
-        st.info("ℹ️ Aguardando dados das transações e fechamentos para plotagem do gráfico completo.")
+    st.markdown("<br><hr style='margin: 10px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+
+    # 🏢 LINHA DE CONTROLADORES DE FILTRO
+    col_titulo_grafico, col_filtro_tempo, col_filtro_tipo = st.columns([2, 1, 1])
+    with col_titulo_grafico:
+        st.markdown("<h3 style='margin-top:5px; padding:0; color:#2C3E50;'>Evolução & Distribuição</h3>", unsafe_allow_html=True)
+    with col_filtro_tempo:
+        anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
+        filtro_ano = st.selectbox("📅 Período", options=anos_disponiveis, index=0)
+    with col_filtro_tipo:
+        tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique()))
+        filtro_tipo = st.selectbox("💰 Tipo de Ativo", options=tipos_disponiveis, index=0)
+
+    # Aplicação dos filtros na base temporal do gráfico
+    df_filtrado_grafico = df_consolidado.copy()
+    if filtro_ano != "Desde o início":
+        df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
+    if filtro_tipo != "Todos os tipos":
+        df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Tipo'] == filtro_tipo]
+
+    # 🏁 LAYOUT DIVIDIDO EM 60% / 40% PARALELOS
+    col_grafico_area, col_grafico_rosca = st.columns([6, 4])
+
+    with col_grafico_area:
+        if not df_filtrado_grafico.empty:
+            df_totais_linha = df_filtrado_grafico.groupby('Mes_Ano').agg({'Custo_Total': 'sum'}).reset_index().sort_values('Mes_Ano')
+            df_totais_linha['Mês_Exibição'] = df_totais_linha['Mes_Ano'].dt.strftime('%m/%Y')
+            
+            df_areas_empilhadas = df_filtrado_grafico.groupby(['Mes_Ano', 'Tipo'])['Patrimonio_Mercado_Ativo'].sum().unstack().fillna(0).reset_index()
+            df_areas_empilhadas['Mês_Exibição'] = df_areas_empilhadas['Mes_Ano'].dt.strftime('%m/%Y')
+
+            fig_premium = go.Figure()
+            
+            # Desenha as Áreas Empilhadas (60% da tela)
+            colunas_areas = [c for c in df_areas_empilhadas.columns if c not in ['Mes_Ano', 'Mês_Exibição']]
+            for tipo_ativo in colunas_areas:
+                fig_premium.add_trace(go.Scatter(
+                    x=df_areas_empilhadas['Mês_Exibição'], 
+                    y=df_areas_empilhadas[tipo_ativo],
+                    mode='lines',
+                    name=f"Mkt: {tipo_ativo}",
+                    stackgroup='one',
+                    line=dict(width=0.5),
+                    hovertemplate='<b>' + tipo_ativo + ':</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                
+            # Desenha a Linha do Custo Investido
+            fig_premium.add_trace(go.Scatter(
+                x=df_totais_linha['Mês_Exibição'], 
+                y=df_totais_linha['Custo_Total'],
+                mode='lines+markers',
+                name='Total Investido (Bolso)',
+                line=dict(color='#118DFF', width=3),
+                marker=dict(size=4),
+                hovertemplate='<b>Total Investido:</b> R$ %{y:,.2f}<extra></extra>'
+            ))
+            
+            fig_premium.update_layout(
+                margin=dict(l=40, r=10, t=10, b=40),
+                height=380,
+                hovermode='x unified',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
+                xaxis=dict(gridcolor='rgba(230,235,240,0.3)', type='category'),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_premium, use_container_width=True)
+        else:
+            st.warning("⚠️ Sem dados cronológicos para os filtros.")
+
+    with col_grafico_rosca:
+        if not df_custodia_atual.empty:
+            # Ordena os ativos do maior para o menor para organizar a legenda
+            df_rosca = df_custodia_atual.sort_values(by='Patrimônio Mercado_Ativo', ascending=False).copy()
+            
+            # Monta os rótulos dinâmicos da legenda colocando o percentual fixado ao lado do Ticker
+            labels_legendas = []
+            total_mercado_rosca = df_rosca['Patrimônio Mercado_Ativo'].sum()
+            for _, row_r in df_rosca.iterrows():
+                pct = (row_r['Patrimônio Mercado_Ativo'] / total_mercado_rosca) * 100 if total_mercado_rosca > 0 else 0.0
+                labels_legendas.append(f"<b>{row_r['Ticker']}</b> ({pct:.1f}%)")
+            
+            fig_pie = go.Figure()
+            fig_pie.add_trace(go.Pie(
+                labels=labels_legendas, 
+                values=df_rosca['Patrimônio Mercado_Ativo'],
+                hole=0.5,             # 🎯 Transforma em Gráfico de Rosca
+                textinfo='none',      # 🎯 Limpa qualquer informação de dentro da fatia
+                hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
+            ))
+            
+            fig_pie.update_layout(
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=380,
+                paper_bgcolor='rgba(0,0,0,0)',
+                showlegend=True,
+                legend=dict(
+                    orientation="v", 
+                    yanchor="middle", 
+                    y=0.5, 
+                    xanchor="left", 
+                    x=1.02,
+                    font=dict(size=11)
+                )
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("ℹ️ Aguardando dados atuais para carregar a alocação.")
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
