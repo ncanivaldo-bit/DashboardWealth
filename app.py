@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO ABSOLUTO E AJUSTE REFINADO DE ABAS
+# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO ABSOLUTO E RECUOS NATIVOS DO STREAMLIT
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -235,7 +235,6 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -252,8 +251,8 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
-    # 🎯 AJUSTADO: margin-top negativa puxa a linha dos cartões para cima em direção às abas de forma sutil
-    st.markdown('<div style="margin-top: -8px;">', unsafe_allow_html=True)
+    # 🎯 AJUSTADO: Margem superior negativa PUXA os cartões para CIMA em direção às abas
+    st.markdown('<div style="margin-top: -10px;">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -321,8 +320,8 @@ with aba_resumo:
         """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # 🎯 AJUSTADO: Margem superior alterada para -22px para puxar o bloco de gráficos para cima com precisão
-    st.markdown('<div style="margin-top: -22px;">', unsafe_allow_html=True)
+    # 🎯 AJUSTADO: Margem superior negativa ampliada para -24px força o bloco de gráficos a SUBIR em direção aos cartões
+    st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
 
     # ==============================================================================
     # BLOCOS GRÁFICOS PARALELOS EQUALIZADOS (60% / 40%) - SIMETRIA TOTAL
