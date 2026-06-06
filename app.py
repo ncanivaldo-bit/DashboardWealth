@@ -366,9 +366,9 @@ with aba_resumo:
                     hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
-                # 🎯 CORRIGIDO: Inserida a vírgula obrigatória em margin=dict(l=45, r=10, t=10, b=10)
+                # 🎯 AJUSTADO: t=25 dá o respiro interno para afastar a legenda, range dinâmico calcula o topo real baseado no seu patrimônio atual e y=1.12 afasta os textos das barras.
                 fig_barras.update_layout(
-                    margin=dict(l=45, r=10, t=10, b=10),
+                    margin=dict(l=45, r=10, t=25, b=10),
                     height=260, 
                     barmode='relative',
                     bargap=0.2,
@@ -379,10 +379,11 @@ with aba_resumo:
                         gridcolor='rgba(230,235,240,0.6)', 
                         tickprefix="R$ ", 
                         tickformat="~s",  
-                        nticks=6          
+                        nticks=6,
+                        range=[0, patrimonio_mercado_kpi * 1.15] # Ajusta dinamicamente a escala para ir muito além de 200k
                     ),
                     xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
+                    legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="center", x=0.5)
                 )
                 st.plotly_chart(fig_barras, use_container_width=True)
 
