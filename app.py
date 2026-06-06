@@ -304,11 +304,11 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # Criado um espaçador controlado de 15px para descolar os blocos com elegância
+    # Espaçador controlado entre cartões e gráficos
     st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
     # ==============================================================================
-    # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
+    # BLOCOS GRÁFICOS PARALELOS EQUALIZADOS (60% / 40%) - SIMETRIA TOTAL
     # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
@@ -318,13 +318,13 @@ with aba_resumo:
             with col_t1:
                 st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
             with col_f1:
-                anos_disponiveis = ["Permanente"] if df_consolidado.empty else ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
+                anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True) if not df_consolidado.empty else ["Desde o início"]
                 filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
                 
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             df_filtrado_grafico = df_consolidado.copy()
-            if filtro_ano != "Desde o início" and filtro_ano != "Permanente" and not df_filtrado_grafico.empty:
+            if filtro_ano != "Desde o início" and not df_filtrado_grafico.empty:
                 df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
 
             if not df_filtrado_grafico.empty:
@@ -353,15 +353,21 @@ with aba_resumo:
                     hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
+                # 🎯 AJUSTADO: height alterado para 260 e tickformat configurado para escala limpa (ex: 50k, 100k, 250k)
                 fig_barras.update_layout(
-                    margin=dict(l=40, r=10, t=10, b=10),
-                    height=310,
+                    margin=dict(l=45, r=10, t=10, b=10),
+                    height=260, 
                     barmode='relative',
                     bargap=0.2,
                     hovermode='x unified',
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
+                    yaxis=dict(
+                        gridcolor='rgba(230,235,240,0.6)', 
+                        tickprefix="R$ ", 
+                        tickformat="~s",  # Transforma números em notações compactas como '200k' automaticamente
+                        nticks=6          # Organiza as linhas de grade para evitar poluição
+                    ),
                     xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
                     legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
                 )
@@ -401,9 +407,10 @@ with aba_resumo:
                     hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
                 
+                # 🎯 AJUSTADO: height reduzido de 280 para 260 para casar milimetricamente com a altura da esquerda
                 fig_pie.update_layout(
                     margin=dict(l=0, r=0, t=10, b=10),
-                    height=280,
+                    height=260, 
                     paper_bgcolor='rgba(0,0,0,0)',
                     showlegend=True,
                     legend=dict(
