@@ -48,7 +48,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
             time.sleep(1)
 
 # ==============================================================================
-# MOTOR MATRICIAL - PROCESSAMENTO DOS DADOS ORIGINAIS
+# MOTOR MATRICIAL - PROCESSAMENTO DOS DADOS
 # ==============================================================================
 try:
     ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
@@ -213,40 +213,44 @@ with aba_resumo:
 
     with col_grafico_barra:
         if not df_filtrado_grafico.empty:
-            # Agrupamento focado estritamente nas DUAS informações principais solicitadas
+            # Consolida totais por mês para as duas variáveis principais
             df_totais_mensais = df_filtrado_grafico.groupby('Mes_Ano').agg({
                 'Custo_Total': 'sum',
                 'Patrimonio_Mercado_Ativo': 'sum'
             }).reset_index().sort_values('Mes_Ano')
             
             df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
+            
+            # 🎯 ENGENHARIA DE EMPILHAMENTO EXATA DA IMAGEM REFERENCE (image_d60bf9.png)
+            # A base é o valor aplicado. O bloco de cima/baixo é estritamente o Ganho de Capital líquido.
+            df_totais_mensais['Valor_Aplicado'] = df_totais_mensais['Custo_Total']
+            df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] - df_totais_mensais['Custo_Total']
 
             fig_barras = go.Figure()
             
-            # Barra 1: Valor de Mercado (Verde Escuro) - Mesma cor de destaque da imagem de referência
+            # 1. Bloco Base: Valor Aplicado (Verde Médio/Fechado da foto)
             fig_barras.add_trace(go.Bar(
                 x=df_totais_mensais['Mês_Exibição'], 
-                y=df_totais_mensais['Patrimonio_Mercado_Ativo'],
-                name='Valor de Mercado Real B3',
-                marker_color='#2E8B57',
-                hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
+                y=df_totais_mensais['Valor_Aplicado'],
+                name='Valor Aplicado (Bolso)',
+                marker_color='#1fbc74', 
+                hovertemplate='<b>Mês:</b> %{x}<br><b>Aplicado:</b> R$ %{y:,.2f}<extra></extra>'
             ))
             
-            # Barra 2: Total Investido (Azul de Contraste do seu bolso)
+            # 2. Bloco Empilhado: Ganho de Capital (Verde Claro no lucro, fura o zero no prejuízo)
             fig_barras.add_trace(go.Bar(
                 x=df_totais_mensais['Mês_Exibição'], 
-                y=df_totais_mensais['Custo_Total'],
-                name='Total Investido (Bolso)',
-                marker_color='#118DFF',
-                hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
+                y=df_totais_mensais['Ganho_de_Capital'],
+                name='Ganho de Capital',
+                marker_color='#7ee0b3',
+                hovertemplate='<b>Mês:</b> %{x}<br><b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
             ))
             
             fig_barras.update_layout(
                 margin=dict(l=40, r=10, t=10, b=40),
                 height=380,
-                barmode='group',   # Barras lado a lado como combinado originalmente
-                bargap=0.15,
-                bargroupgap=0.05,
+                barmode='relative',  # 🎯 O segredo exato da foto: empilha relativo ao zero!
+                bargap=0.2,
                 hovermode='x unified',
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -260,10 +264,8 @@ with aba_resumo:
 
     with col_grafico_rosca:
         if not df_custodia_atual.empty:
-            # Organiza os ativos atuais pelo tamanho do patrimônio
             df_rosca = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
             
-            # Rótulos da legenda: Ticker + Peso Percentual
             labels_legendas = []
             total_mercado_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
             for _, row_r in df_rosca.iterrows():
