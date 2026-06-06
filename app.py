@@ -222,7 +222,7 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-# 🎯 AJUSTADO: Reduzido o espaço entre a linha das abas e os cartões para 2px
+# 🎯 Ajustado o respiro sutil entre a linha de abas e os cartões
 st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
@@ -306,8 +306,8 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # 🎯 AJUSTADO: Reduzido o espaço entre os cartões e os gráficos para 8px (vão pequeno, sem grudar)
-    st.markdown('<div style="margin-top: 8px;"></div>', unsafe_allow_html=True)
+    # 🎯 MARGEM INVERSA APLICADA: Puxa o bloco inferior inteiro para cima, comprimindo o espaço vazio
+    st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
 
     # ==============================================================================
     # BLOCOS GRÁFICOS PARALELOS EQUALIZADOS (60% / 40%) - SIMETRIA TOTAL
@@ -425,6 +425,7 @@ with aba_resumo:
                 st.plotly_chart(fig_pie, use_container_width=True)
             else:
                 st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
+    st.markdown('</div>', unsafe_allow_html=True) # Fecha container de margem inversa
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
