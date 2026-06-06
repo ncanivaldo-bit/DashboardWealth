@@ -48,7 +48,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
             time.sleep(1)
 
 # ==============================================================================
-# MOTOR MATRICIAL - PROCESSAMENTO INTEGRADO DE DADOS
+# MOTOR MATRICIAL - PROCESSAMENTO DOS DADOS ORIGINAIS
 # ==============================================================================
 try:
     ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
@@ -79,7 +79,7 @@ try:
     df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
     df_precos_historicos['Chave_Merge'] = df_precos_historicos['Chave_Merge'].astype(str).str.strip()
 
-    # Processamento de Custódia e Saldos
+    # Processamento cronológico das quantidades e custos
     eventos_custodia = ['Compra', 'Venda', 'Desdobro']
     df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
     
@@ -151,7 +151,7 @@ try:
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         df_consolidado['Tipo'] = df_consolidado['Tipo'].fillna('OUTROS')
         
-        # Consolidação da Foto de Custódia Atual para alimentar os KPIs e a Rosca
+        # Consolidação da Custódia Atual Real de hoje para os KPIs e Rosca
         df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
         df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
         
@@ -193,7 +193,7 @@ with aba_resumo:
     # 🏢 LINHA DE CONTROLADORES DE FILTRO
     col_titulo_grafico, col_filtro_tempo, col_filtro_tipo = st.columns([2, 1, 1])
     with col_titulo_grafico:
-        st.markdown("<h3 style='margin-top:5px; padding:0; color:#2C3E50;'>Evolução & Distribuição</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin-top:5px; padding:0; color:#2C3E50;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
     with col_filtro_tempo:
         anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
         filtro_ano = st.selectbox("📅 Período", options=anos_disponiveis, index=0)
@@ -209,45 +209,44 @@ with aba_resumo:
         df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Tipo'] == filtro_tipo]
 
     # 🏁 LAYOUT DIVIDIDO EM 60% / 40% PARALELOS
-    col_grafico_area, col_grafico_rosca = st.columns([6, 4])
+    col_grafico_barra, col_grafico_rosca = st.columns([6, 4])
 
-    with col_grafico_area:
+    with col_grafico_barra:
         if not df_filtrado_grafico.empty:
-            df_totais_linha = df_filtrado_grafico.groupby('Mes_Ano').agg({'Custo_Total': 'sum'}).reset_index().sort_values('Mes_Ano')
-            df_totais_linha['Mês_Exibição'] = df_totais_linha['Mes_Ano'].dt.strftime('%m/%Y')
+            # Agrupamento focado estritamente nas DUAS informações principais solicitadas
+            df_totais_mensais = df_filtrado_grafico.groupby('Mes_Ano').agg({
+                'Custo_Total': 'sum',
+                'Patrimonio_Mercado_Ativo': 'sum'
+            }).reset_index().sort_values('Mes_Ano')
             
-            df_areas_empilhadas = df_filtrado_grafico.groupby(['Mes_Ano', 'Tipo'])['Patrimonio_Mercado_Ativo'].sum().unstack().fillna(0).reset_index()
-            df_areas_empilhadas['Mês_Exibição'] = df_areas_empilhadas['Mes_Ano'].dt.strftime('%m/%Y')
+            df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
 
-            fig_premium = go.Figure()
+            fig_barras = go.Figure()
             
-            # Desenha as Áreas Empilhadas (60% da tela)
-            colunas_areas = [c for c in df_areas_empilhadas.columns if c not in ['Mes_Ano', 'Mês_Exibição']]
-            for tipo_ativo in colunas_areas:
-                fig_premium.add_trace(go.Scatter(
-                    x=df_areas_empilhadas['Mês_Exibição'], 
-                    y=df_areas_empilhadas[tipo_ativo],
-                    mode='lines',
-                    name=f"Mkt: {tipo_ativo}",
-                    stackgroup='one',
-                    line=dict(width=0.5),
-                    hovertemplate='<b>' + tipo_ativo + ':</b> R$ %{y:,.2f}<extra></extra>'
-                ))
-                
-            # Desenha a Linha do Custo Investido
-            fig_premium.add_trace(go.Scatter(
-                x=df_totais_linha['Mês_Exibição'], 
-                y=df_totais_linha['Custo_Total'],
-                mode='lines+markers',
-                name='Total Investido (Bolso)',
-                line=dict(color='#118DFF', width=3),
-                marker=dict(size=4),
-                hovertemplate='<b>Total Investido:</b> R$ %{y:,.2f}<extra></extra>'
+            # Barra 1: Valor de Mercado (Verde Escuro) - Mesma cor de destaque da imagem de referência
+            fig_barras.add_trace(go.Bar(
+                x=df_totais_mensais['Mês_Exibição'], 
+                y=df_totais_mensais['Patrimonio_Mercado_Ativo'],
+                name='Valor de Mercado Real B3',
+                marker_color='#2E8B57',
+                hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
             ))
             
-            fig_premium.update_layout(
+            # Barra 2: Total Investido (Azul de Contraste do seu bolso)
+            fig_barras.add_trace(go.Bar(
+                x=df_totais_mensais['Mês_Exibição'], 
+                y=df_totais_mensais['Custo_Total'],
+                name='Total Investido (Bolso)',
+                marker_color='#118DFF',
+                hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
+            ))
+            
+            fig_barras.update_layout(
                 margin=dict(l=40, r=10, t=10, b=40),
                 height=380,
+                barmode='group',   # Barras lado a lado como combinado originalmente
+                bargap=0.15,
+                bargroupgap=0.05,
                 hovermode='x unified',
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -255,28 +254,28 @@ with aba_resumo:
                 xaxis=dict(gridcolor='rgba(230,235,240,0.3)', type='category'),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
-            st.plotly_chart(fig_premium, use_container_width=True)
+            st.plotly_chart(fig_barras, use_container_width=True)
         else:
             st.warning("⚠️ Sem dados cronológicos para os filtros.")
 
     with col_grafico_rosca:
         if not df_custodia_atual.empty:
-            # Ordena os ativos do maior para o menor para organizar a legenda
-            df_rosca = df_custodia_atual.sort_values(by='Patrimônio Mercado_Ativo', ascending=False).copy()
+            # Organiza os ativos atuais pelo tamanho do patrimônio
+            df_rosca = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
             
-            # Monta os rótulos dinâmicos da legenda colocando o percentual fixado ao lado do Ticker
+            # Rótulos da legenda: Ticker + Peso Percentual
             labels_legendas = []
-            total_mercado_rosca = df_rosca['Patrimônio Mercado_Ativo'].sum()
+            total_mercado_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
             for _, row_r in df_rosca.iterrows():
-                pct = (row_r['Patrimônio Mercado_Ativo'] / total_mercado_rosca) * 100 if total_mercado_rosca > 0 else 0.0
+                pct = (row_r['Patrimonio_Mercado_Ativo'] / total_mercado_rosca) * 100 if total_mercado_rosca > 0 else 0.0
                 labels_legendas.append(f"<b>{row_r['Ticker']}</b> ({pct:.1f}%)")
             
             fig_pie = go.Figure()
             fig_pie.add_trace(go.Pie(
                 labels=labels_legendas, 
-                values=df_rosca['Patrimônio Mercado_Ativo'],
-                hole=0.5,             # 🎯 Transforma em Gráfico de Rosca
-                textinfo='none',      # 🎯 Limpa qualquer informação de dentro da fatia
+                values=df_rosca['Patrimonio_Mercado_Ativo'],
+                hole=0.5,
+                textinfo='none',
                 hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
             ))
             
