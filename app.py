@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO ABSOLUTO E AJUSTE REFINADO DE ABAS
+# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO ABSOLUTO E RECUOS NATIVOS DO STREAMLIT
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -34,7 +34,7 @@ st.markdown("""
             margin-top: -25px !important;
         }
         
-        /* 4. 🎯 AJUSTADO: Cola o título "PREVPRIV" no topo absoluto do navegador */
+        /* 4. Cola o título "PREVPRIV" no topo absoluto do navegador */
         h1 { 
             margin-top: -25px !important; 
             margin-bottom: 5px !important; 
@@ -235,7 +235,6 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -252,6 +251,8 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
+    # 🎯 AJUSTADO: margem-top negativa PUXA os cartões para CIMA na mesma proporção em direção às abas
+    st.markdown('<div style="margin-top: -10px;">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -317,9 +318,10 @@ with aba_resumo:
                 </div>
             </div>
         """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
-    st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
+    # 🎯 AJUSTADO: Margem superior alterada para -24px força o bloco de gráficos a SUBIR em direção aos cartões na proporção exata
+    st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
 
     # ==============================================================================
     # BLOCOS GRÁFICOS PARALELOS EQUALIZADOS (60% / 40%) - SIMETRIA TOTAL
@@ -368,7 +370,7 @@ with aba_resumo:
                 ))
                 
                 fig_barras.update_layout(
-                    margin=dict(l=45, r=10, t=10, b=10),
+                    margin=dict(l=45, r=10, t=10 b=10),
                     height=260, 
                     barmode='relative',
                     bargap=0.2,
