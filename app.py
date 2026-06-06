@@ -348,4 +348,102 @@ with aba_resumo:
                 
                 df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
                 df_totais_mensais['Valor_Aplicado'] = df_totais_mensais['Custo_Total']
-                df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] -
+                # 🎯 CORRIGIDO: Linha restaurada por completo
+                df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] - df_totais_mensais['Custo_Total']
+
+                # Lógica de limites estritos e protegidos
+                menor_ganho_historico = float(df_totais_mensais['Ganho_de_Capital'].min())
+                limite_fundo = (menor_ganho_historico * 1.3) if menor_ganho_historico < 0 else -30000.0
+                limite_topo = patrimonio_mercado_kpi * 1.20
+
+                fig_barras = go.Figure()
+                fig_barras.add_trace(go.Bar(
+                    x=df_totais_mensais['Mês_Exibição'], 
+                    y=df_totais_mensais['Valor_Aplicado'],
+                    name='Valor aplicado',
+                    marker_color='#1fbc74', 
+                    hovertemplate='<b>Aplicado:</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                fig_barras.add_trace(go.Bar(
+                    x=df_totais_mensais['Mês_Exibição'], 
+                    y=df_totais_mensais['Ganho_de_Capital'],
+                    name='Ganho de Capital',
+                    marker_color='#7ee0b3',
+                    hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                
+                fig_barras.update_layout(
+                    margin=dict(l=45, r=10, t=25, b=10),
+                    height=260, 
+                    barmode='relative',
+                    bargap=0.2,
+                    hovermode='x unified',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    yaxis=dict(
+                        gridcolor='rgba(230,235,240,0.6)', 
+                        tickprefix="R$ ", 
+                        tickformat="~s",  
+                        nticks=6,
+                        range=[limite_fundo, limite_topo]
+                    ),
+                    xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
+                )
+                st.plotly_chart(fig_barras, use_container_width=True)
+
+    with col_bloco_direito:
+        with st.container(border=True):
+            col_t2, col_f2 = st.columns([6, 4])
+            with col_t2:
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
+            with col_f2:
+                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
+                filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
+                
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+            df_rosca_filtrada = df_custodia_atual.copy()
+            if filtro_tipo != "Todos os tipos" and not df_rosca_filtrada.empty:
+                df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
+
+            if not df_rosca_filtrada.empty:
+                df_rosca = df_rosca_filtrada.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
+                
+                labels_legendas = []
+                total_mercado_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
+                for _, row_r in df_rosca.iterrows():
+                    pct = (row_r['Patrimonio_Mercado_Ativo'] / total_mercado_rosca) * 100 if total_mercado_rosca > 0 else 0.0
+                    labels_legendas.append(f"<b>{row_r['Ticker']}</b> ({pct:.1f}%)")
+                
+                fig_pie = go.Figure()
+                fig_pie.add_trace(go.Pie(
+                    labels=labels_legendas, 
+                    values=df_rosca['Patrimonio_Mercado_Ativo'],
+                    hole=0.55,
+                    domain=dict(x=[0.0, 0.65]),
+                    textinfo='none',
+                    hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
+                ))
+                
+                fig_pie.update_layout(
+                    margin=dict(l=0, r=0, t=10, b=10),
+                    height=260, 
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    showlegend=True,
+                    legend=dict(
+                        orientation="v", 
+                        yanchor="middle", 
+                        y=0.5, 
+                        xanchor="left", 
+                        x=0.68,
+                        font=dict(size=10)
+                    )
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with aba_alocacao:
+    st.info("⚙️ Aba de alocação estruturada.")
