@@ -10,13 +10,25 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # ==============================================================================
-# CONFIGURAÇÃO DE TELA E IDENTIDADE VISUAL
+# CONFIGURAÇÃO DE TELA E AJUSTE ANTIRROLAGEM (100% VIEWPORT)
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA ESCONDER O ÍCONE DO GITHUB E MENUS DE CONFIGURAÇÃO DO STREAMLIT
+# Injeção de CSS para travar o layout na altura exata da tela e eliminar gaps
 st.markdown("""
     <style>
+        /* Remove o scrollbar da página principal e trava a altura máxima */
+        html, body, [data-testid="stAppViewContainer"] {
+            height: 100vh;
+            overflow: hidden;
+        }
+        /* Compacta o bloco de conteúdo principal */
+        [data-testid="stMain"] {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
         /* Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
@@ -24,11 +36,16 @@ st.markdown("""
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
+        
+        /* Reduz margens de cabeçalhos e componentes de filtros */
+        h1 { margin-top: -15px !important; margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 28px !important; }
+        .stTabs [data-baseweb="tab-list"] { gap: 10px !important; }
+        .stTabs [data-baseweb="tab"] { padding-top: 4px !important; padding-bottom: 4px !important; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("PREVPRIV")
-st.markdown("<p style='margin-bottom: -10px; font-size: 16px;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
+st.markdown("<p style='margin-top: -5px; margin-bottom: 5px; font-size: 15px;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
 
 # ==============================================================================
 # CONEXÃO DIRETA COM O GOOGLE DRIVE (Com proteção de Retry)
@@ -207,9 +224,8 @@ if not df_custodia_atual.empty:
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
 # ==============================================================================
-# RENDERIZAÇÃO DA INTERFACE VISUAL
+# RENDERIZAÇÃO DA INTERFACE VISUAL COMPACTA
 # ==============================================================================
-st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -230,60 +246,54 @@ with aba_resumo:
     
     with col1:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Total Investido: <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong></span>
-                    <span>Var: <strong style="color: {color_var}; font-size: 12px;">{formatar_pct(variacao_carteira_pct)}</strong></span>
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
+                <div style="color: #2C3E50; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(patrimonio_mercado_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Investido: <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong></span>
+                    <span>Var: <strong style="color: {color_var};">{formatar_pct(variacao_carteira_pct)}</strong></span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col2:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
-                <div style="color: {color_lucro}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(lucro_total_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 9px; text-transform: uppercase; color: #7F8C8D; line-height: 1.1;">Ganho de Capital</div>
-                        <div style="color: {color_ganho}; font-weight: bold; font-size: 12px; margin-top: 2px;">{formatar_br(ganho_capital_kpi)}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 9px; text-transform: uppercase; color: #7F8C8D; line-height: 1.1;">Dividendos Recebidos</div>
-                        <div style="color: #2E8B57; font-weight: bold; font-size: 12px; margin-top: 2px;">{formatar_br(total_dividendos)}</div>
-                    </div>
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
+                <div style="color: {color_lucro}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(lucro_total_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 10px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                    <span>G. Cap: <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong></span>
+                    <span>Prov: <strong style="color: #2E8B57;">{formatar_br(total_dividendos)}</strong></span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col3:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
-                <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(ult_provento_val)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                    Mês de Referência: <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
+                <div style="color: #2E8B57; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(ult_provento_val)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 11px; color: #7F8C8D;">
+                    Mês Ref: <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col4:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
-                <div style="color: {color_rent}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_pct(rentabilidade_total_pct)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                    Resultado Comercial: <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
+                <div style="color: {color_rent}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_pct(rentabilidade_total_pct)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 11px; color: #7F8C8D;">
+                    Resultado Com: <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin: 5px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 4px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
     # ==============================================================================
-    # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
+    # GRID GRÁFICOS PARALELOS (60% / 40%) - ENGENHARIA DE TELA ÚNICA
     # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
@@ -291,12 +301,12 @@ with aba_resumo:
         with st.container(border=True):
             col_t1, col_f1 = st.columns([7, 3])
             with col_t1:
-                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:17px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
             with col_f1:
                 anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True) if not df_consolidado.empty else ["Desde o início"]
                 filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 
             df_filtrado_grafico = df_consolidado.copy()
             if filtro_ano != "Desde o início" and not df_filtrado_grafico.empty:
@@ -330,7 +340,7 @@ with aba_resumo:
                 
                 fig_barras.update_layout(
                     margin=dict(l=35, r=5, t=10, b=10),
-                    height=280,
+                    height=230, # Reduzido cirurgicamente para travar o layout em tela cheia
                     barmode='relative',
                     bargap=0.2,
                     hovermode='x unified',
@@ -346,12 +356,12 @@ with aba_resumo:
         with st.container(border=True):
             col_t2, col_f2 = st.columns([6, 4])
             with col_t2:
-                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:17px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
             with col_f2:
                 tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 
             df_rosca_filtrada = df_custodia_atual.copy()
             if filtro_tipo != "Todos os tipos" and not df_rosca_filtrada.empty:
@@ -378,7 +388,7 @@ with aba_resumo:
                 
                 fig_pie.update_layout(
                     margin=dict(l=0, r=0, t=10, b=10),
-                    height=280,
+                    height=230, # Reduzido simetricamente com a mesma altura das barras
                     paper_bgcolor='rgba(0,0,0,0)',
                     showlegend=True,
                     legend=dict(
