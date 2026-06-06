@@ -14,24 +14,27 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA ESCONDER O ÍCONE DO GITHUB, MENUS E ELIMINAR O ESPAÇO DO TOPO
+# 🎯 FORÇANDO O ACESSAMENTO DO TOPO VIA IDENTIFICADOR INTERNO DO STREAMLIT
 st.markdown("""
     <style>
-        /* Esconde o cabeçalho e menus nativos */
-        [data-testid="stHeader"] { display: none !important; }
+        /* 1. Remove a barra de cabeçalho transparente nativa */
+        [data-testid="stHeader"] { display: none !important; visibility: hidden; }
+        
+        /* 2. Zera cirurgicamente o recuo gigante do topo da página principal */
+        [data-testid="stMainBlockContainer"] {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+        }
+        
+        /* 3. Oculta os menus e botões da plataforma */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
         
-        /* Esconde o ícone do GitHub no canto superior direito */
+        /* 4. Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
-        
-        /* Elimina o espaço em branco gigante superior puxando o painel para o topo */
-        .main .block-container {
-            padding-top: 1rem !important;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -288,7 +291,7 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin: 5px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+    st.markdown("<br><hr style='margin: 10px 0; border-color: #ECEFF1;'><br>", unsafe_allow_html=True)
 
     # ==============================================================================
     # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
@@ -304,7 +307,7 @@ with aba_resumo:
                 anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True) if not df_consolidado.empty else ["Desde o início"]
                 filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             df_filtrado_grafico = df_consolidado.copy()
             if filtro_ano != "Desde o início" and not df_filtrado_grafico.empty:
