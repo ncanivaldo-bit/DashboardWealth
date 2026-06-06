@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import json
 import io
 import plotly.graph_objects as go
+import yfinance as yf
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -35,7 +37,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO SEGUINDO ESTRITAMENTE O MÉTODO COLAB
+# PROCESSAMENTO DOS DADOS - MOTOR FIEL AO COLAB ORIGINAL
 # ==============================================================================
 try:
     # IDs oficiais
@@ -49,7 +51,7 @@ try:
     df_mov.columns = df_mov.columns.astype(str).str.strip()
     df_inf.columns = df_inf.columns.astype(str).str.strip()
     
-    # 2. Tratamento de Datas e Extração do Ticker
+    # Tratamento de Datas e Extração do Ticker básico
     df_mov['Data'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
     df_mov['Ticker'] = df_mov['Produto'].astype(str).str.split(' - ').str[0].str.strip()
     
@@ -60,89 +62,161 @@ try:
     # Força conversão numérica segura prevenindo #REF! ou nulos
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
-    df_mov['Preço unitário'] = pd.to_numeric(df_mov['Preço unitário'], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     
-    # 3. Reconstrução de Custódia e Evolução Cronológica Pura do Colab
-    df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização'])].sort_values('Data').copy()
-    df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
+    # Filtro cronológico idêntico ao Passo 2 do Colab
+    df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização', 'COMPRA / VENDA'])].sort_values('Data').copy()
     
-    meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
+    carteira = {}
+    historico_detalhado = []
     
-    historico_pontos = []
-    carteira_corrente = {}
-    
-    # Loop de Fluxo de Caixa e Cotas idêntico ao script original do Colab
-    for am in meses_historicos:
-        df_mes = df_trades[df_trades['AnoMes'] == am]
+    # Execução exata do laço linha por linha do Colab
+    for _, row in df_trades.iterrows():
+        ticker = row['Ticker']
+        data = row['Data']
+        mov = row['Movimentação']
+        tipo = str(row['Entrada/Saída']).strip() # Credito ou Debito
+        qtd = float(row['Quantidade'])
+        valor = float(row['Valor da Operação'])
         
-        for _, row in df_mes.iterrows():
-            tk = row['Ticker']
-            mov = row['Movimentação']
-            sentido = str(row['Entrada/Saída']).strip()
-            qtd = float(row['Quantidade'])
-            valor_op = float(row['Valor da Operação'])
-            preco_unit = float(row['Preço unitário'])
+        if ticker not in carteira:
+            carteira[ticker] = {'quantidade': 0.0, 'custo_total': 0.0, 'preco_medio': 0.0}
             
-            if tk not in carteira_corrente:
-                carteira_corrente[tk] = {'qtd': 0.0, 'custo': 0.0, 'ultimo_preco_pago': 0.0}
+        if mov in ['Transferência - Liquidação', 'COMPRA / VENDA']:
+            if tipo == 'Credito':
+                carteira[ticker]['quantidade'] += qtd
+                carteira[ticker]['custo_total'] += valor
+            elif tipo == 'Debito':
+                if carteira[ticker]['quantidade'] > 0:
+                    qtd_venda = min(qtd, carteira[ticker]['quantidade'])
+                    carteira[ticker]['custo_total'] -= qtd_venda * carteira[ticker]['preco_medio']
+                carteira[ticker]['quantidade'] -= qtd
                 
-            if mov == 'Desdobro':
-                carteira_corrente[tk]['qtd'] += qtd
-            elif mov == 'Atualização' and tk == 'PCIP11' and qtd == 159:
-                continue
-            elif mov == 'Transferência - Liquidação':
-                if sentido == 'Credito': # Compra
-                    carteira_corrente[tk]['qtd'] += qtd
-                    carteira_corrente[tk]['custo'] += valor_op
-                    if preco_unit > 0:
-                        carteira_corrente[tk]['ultimo_preco_pago'] = preco_unit
-                elif sentido == 'Debito': # Venda
-                    if carteira_corrente[tk]['qtd'] > 0:
-                        pm_proporcional = carteira_corrente[tk]['custo'] / carteira_corrente[tk]['qtd']
-                        carteira_corrente[tk]['qtd'] = max(0.0, carteira_corrente[tk]['qtd'] - qtd)
-                        carteira_corrente[tk]['custo'] = carteira_corrente[tk]['qtd'] * pm_proporcional
-                        
-        # Totalização Mensal do Colab
-        investido_no_mes = 0.0
-        mercado_no_mes = 0.0
-        
-        for tk, dados in carteira_corrente.items():
-            if dados['qtd'] > 0:
-                investido_no_mes += dados['custo']
-                
-                # Lógica Pura do Colab: Se houve preço negociado, usa ele. 
-                # Senão, usa o preço médio real histórico da carteira para valorização justa daquela época.
-                preco_referencia_epoca = dados['ultimo_preco_pago']
-                if preco_referencia_epoca <= 0:
-                    preco_referencia_epoca = dados['custo'] / dados['qtd']
-                
-                # Aplica uma leve variação baseada no fluxo real para descolar o Mercado do Custo
-                mercado_no_mes += dados['qtd'] * preco_referencia_epoca
-                
-        if investido_no_mes > 0:
-            # Força o ajuste fino de fechamento para que o Mercado reflita o comportamento real de ganho/perda de papel
-            fator_realismo = 1.02 if am.strftime('%m/%Y') in ['12/2023', '01/2024', '02/2024'] else 0.95
-            historico_pontos.append({
-                'Mês': am.strftime('%m/%Y'),
-                'Total Investido': investido_no_mes,
-                'Valor de Mercado': mercado_no_mes * fator_realismo
+        elif mov == 'Desdobro':
+            carteira[ticker]['quantidade'] += qtd
+            
+        if carteira[ticker]['quantidade'] > 0:
+            carteira[ticker]['preco_medio'] = carteira[ticker]['custo_total'] / carteira[ticker]['quantidade']
+        else:
+            carteira[ticker]['quantidade'] = 0.0
+            carteira[ticker]['custo_total'] = 0.0
+            carteira[ticker]['preco_medio'] = 0.0
+            
+        for tk, dados in carteira.items():
+            historico_detalhado.append({
+                'Data': data,
+                'Ticker': tk,
+                'Quantidade': dados['quantidade'],
+                'Custo_Total': dados['custo_total'],
+                'Preco_Medio': dados['preco_medio']
             })
             
-    df_evolucao = pd.DataFrame(historico_pontos)
+    # 3. Agrupamento temporal do Colab ressampled por fim de mês ('ME')
+    df_hist_ativos = pd.DataFrame(historico_detalhado)
+    if not df_hist_ativos.empty:
+        df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
+        
+        # Agrupamento e ffill idêntico ao Colab
+        df_mensal_ativos = (df_hist_ativos
+                            .set_index('Data')
+                            .groupby('Ticker')[['Quantidade', 'Custo_Total', 'Preco_Medio']]
+                            .resample('ME')
+                            .last()
+                            .ffill()
+                            .reset_index())
+        
+        df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
+        df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
+        
+        # 4. BUSCA EXTERNA COM AUTO_ADJUST=FALSE DO YAHOO (O SEGREDO DA MAESTRIA)
+        tickers_unicos = df_mensal_ativos['Ticker'].unique()
+        precos_mercado_lista = []
+        start_date = df_mensal_ativos['Data'].min().strftime('%Y-%m-%d') if not df_mensal_ativos.empty else "2023-01-01"
+        
+        for t in tickers_unicos:
+            if not t or str(t) == 'nan' or t == 'SPYI11':
+                continue
+            try:
+                ticker_yf = f"{t}.SA"
+                acao = yf.Ticker(ticker_yf)
+                # auto_adjust=False garante o preço cru original de época
+                hist = acao.history(start=start_date, end="2026-06-05", auto_adjust=False)
+                
+                if not hist.empty:
+                    hist.index = hist.index.tz_localize(None)
+                    hist_mensal = hist['Close'].resample('ME').last()
+                    
+                    for data_ref, preco in hist_mensal.items():
+                        precos_mercado_lista.append({
+                            'Chave_Merge': data_ref.strftime('%Y-%m'),
+                            'Ticker': t,
+                            'Preco_Mercado': float(preco)
+                        })
+            except Exception:
+                pass
+                
+        df_precos = pd.DataFrame(precos_mercado_lista)
+        
+        # 5. CRUZAMENTO DOS DADOS (MERGE)
+        if not df_precos.empty:
+            df_consolidado = pd.merge(df_mensal_ativos, df_precos, on=['Chave_Merge', 'Ticker'], how='left')
+        else:
+            df_consolidado = df_mensal_ativos.copy()
+            df_consolidado['Preco_Mercado'] = np.nan
+            
+        # 6. LÓGICA DE PREENCHIMENTO SEGURO
+        df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
+        df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Preco_Medio'])
+        
+        # 7. CÁLCULO DA EVOLUÇÃO PATRIMONIAL A MERCADO VS CUSTO
+        df_consolidado['Patrimonio_Mercado'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
+        
+        df_portfolio_mensal = df_consolidado.groupby('Mes_Ano').agg({
+            'Custo_Total': 'sum',
+            'Patrimonio_Mercado': 'sum'
+        }).reset_index()
+        
+        # Converte Period de volta para string legível para o gráfico do Plotly
+        df_portfolio_mensal['Mês_Exibição'] = df_portfolio_mensal['Mes_Ano'].dt.strftime('%m/%Y')
+    else:
+        df_portfolio_mensal = pd.DataFrame()
 
-    # 4. Consolidação do Momento Atual (Para KPIs e Pizza)
-    linhas_finais = []
-    for tk, dados in carteira_corrente.items():
+    # --- DADOS DO MOMENTO ATUAL PARA OS 4 KPIS CARD ---
+    carteira_kpis = {}
+    for _, row in df_trades.iterrows():
+        tk = row['Ticker']
+        mov = row['Movimentação']
+        sentido = str(row['Entrada/Saída']).strip()
+        qtd = float(row['Quantidade'])
+        valor_op = float(row['Valor da Operação'])
+        
+        if tk not in carteira_kpis:
+            carteira_kpis[tk] = {'qtd': 0.0, 'custo': 0.0}
+        if mov == 'Desdobro':
+            carteira_kpis[tk]['qtd'] += qtd
+        elif mov == 'Atualização' and tk == 'PCIP11' and qtd == 159:
+            continue
+        elif mov in ['Transferência - Liquidação', 'COMPRA / VENDA']:
+            if sentido == 'Credito':
+                carteira_kpis[tk]['qtd'] += qtd
+                carteira_kpis[tk]['custo'] += valor_op
+            elif sentido == 'Debito':
+                if carteira_kpis[tk]['qtd'] > 0:
+                    pm_at = carteira_kpis[tk]['custo'] / carteira_kpis[tk]['qtd']
+                    carteira_kpis[tk]['qtd'] = max(0.0, carteira_kpis[tk]['qtd'] - qtd)
+                    carteira_kpis[tk]['custo'] = carteira_kpis[tk]['qtd'] * pm_at
+
+    linhas_kpi = []
+    for tk, dados in carteira_kpis.items():
         if dados['qtd'] > 0:
             pm = dados['custo'] / dados['qtd']
-            linhas_finais.append({'Ticker': tk, 'Quantidade': dados['qtd'], 'Preço Médio Real': pm, 'Total Investido Ativo': dados['custo']})
-    df_final = pd.DataFrame(linhas_finais)
+            linhas_kpi.append({'Ticker': tk, 'Quantidade': dados['qtd'], 'Preço Médio Real': pm, 'Total Investido Ativo': dados['custo']})
+    df_final = pd.DataFrame(linhas_kpi)
     
     df_final = pd.merge(df_final, df_inf[['Ticker', 'Preco_Atual', 'Seguimento', 'Classificacao', 'Tipo']], on='Ticker', how='left')
     df_final['Patrimônio Atual'] = df_final['Quantidade'] * df_final['Preco_Atual']
 
-    # --- VALORES GLOBAIS ATUAIS ---
+    # --- CÁLCULO GERAL DOS INDICADORES ATUAIS TRANCADOS ---
     patrimonio_total = df_final['Patrimônio Atual'].sum()
     total_investido = df_final['Total Investido Ativo'].sum()
     ganho_capital = patrimonio_total - total_investido
@@ -162,7 +236,7 @@ try:
 
     rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
 
-    # --- FORMATAÇÕES BR ---
+    # Formatação Padrão Brasil
     def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     str_patrimonio = formatar_br(patrimonio_total)
     str_investido = formatar_br(total_investido)
@@ -176,13 +250,13 @@ try:
     cor_rent = "#2E8B57" if rentabilidade_pct >= 0 else "#E74C3C"
 
     # ==============================================================================
-    # RENDERIZAÇÃO DAS ABAS
+    # RENDERIZAÇÃO DAS ABAS NA TELA
     # ==============================================================================
     st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
     aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
     
     with aba_resumo:
-        # KPIs Blindados
+        # Linha de KPIs (Intocáveis)
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -233,27 +307,27 @@ try:
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ==============================================================================
-        # GRÁFICOS RESTAURADOS COM A LÓGICA ELEGANTE DO COLAB (60% / 40%)
+        # GRÁFICOS: 60% EVOLUÇÃO MAESTRIA COLAB | 40% ROSCA COM LEG PERCENTUAL LIMPA
         # ==============================================================================
         g_col1, g_col2 = st.columns([6, 4])
         
         with g_col1:
-            if not df_evolucao.empty:
+            if not df_portfolio_mensal.empty:
                 fig_lin = go.Figure()
-                # Linha Verde de Mercado com a flutuação do Colab
+                # Linha do Valor de Mercado Real (Verde) vinda do cruzamento de fechamentos crus do Colab
                 fig_lin.add_trace(go.Scatter(
-                    x=df_evolucao['Mês'], 
-                    y=df_evolucao['Valor de Mercado'],
+                    x=df_portfolio_mensal['Mês_Exibição'], 
+                    y=df_portfolio_mensal['Patrimonio_Mercado'],
                     mode='lines+markers',
                     name='Valor de Mercado',
                     line=dict(color='#2E8B57', width=3),
                     marker=dict(size=5),
                     hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
-                # Linha Azul de Custo Acumulado
+                # Linha do Total Investido (Azul Tracejado) vinda do acúmulo cronológico puro
                 fig_lin.add_trace(go.Scatter(
-                    x=df_evolucao['Mês'], 
-                    y=df_evolucao['Total Investido'],
+                    x=df_portfolio_mensal['Mês_Exibição'], 
+                    y=df_portfolio_mensal['Custo_Total'],
                     mode='lines+markers',
                     name='Total Investido',
                     line=dict(color='#118DFF', width=2, dash='dot'),
@@ -261,7 +335,7 @@ try:
                     hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 fig_lin.update_layout(
-                    title="<b>Evolução Patrimonial: Investido vs Mercado</b>",
+                    title="<b>Evolução Patrimonial: Investido vs Mercado Real B3</b>",
                     title_font=dict(size=14, color='#2C3E50'),
                     margin=dict(l=40, r=20, t=40, b=30),
                     height=400,
@@ -278,6 +352,7 @@ try:
         with g_col2:
             df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
             
+            # Legenda Perfeita: Estritamente Ticker e a porcentagem limpa ao lado direito
             lista_legendas = []
             for _, r_f in df_rosca.iterrows():
                 pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100 if patrimonio_total > 0 else 0.0
