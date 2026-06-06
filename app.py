@@ -41,7 +41,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# MOTOR DE CÁLCULO PREVPRIV - EVOLUÇÃO DO VALOR INVESTIDO
+# MOTOR DE CÁLCULO PREVPRIV - FILTRADO APENAS PARA RENDA VARIÁVEL
 # ==============================================================================
 df_portfolio_mensal = pd.DataFrame()
 total_investido_kpi = 0.0
@@ -63,16 +63,17 @@ try:
     df_mov['Valor_Operacao_Num'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
     df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
     
-    # 4. Isolar eventos de modificação de patrimônio (Bolsa + CDB)
-    df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'COMPRA / VENDA'])].sort_values('Data_Datetime').copy()
+    # 🎯 FILTRO DE OURO: Captura APENAS eventos de custódia de Bolsa (FIIs e Ações), removendo os CDBs ('COMPRA / VENDA')
+    df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro'])].sort_values('Data_Datetime').copy()
     
-    # 5. Algoritmo Cronológico de Fluxo de Caixa Investido
+    # 4. Algoritmo Cronológico de Fluxo de Caixa Investido (Líquido de Renda Variável)
     carteira = {}
     historico_financeiro = []
     
     for _, row in df_trades.iterrows():
         ticker = row['Ticker_Base']
         data = row['Data_Datetime']
+        mov = row['Movimentação']
         tipo = str(row['Entrada/Saída']).strip()
         qtd = float(row['Quantidade_Num'])
         valor = float(row['Valor_Operacao_Num'])
@@ -83,16 +84,22 @@ try:
         if ticker not in carteira:
             carteira[ticker] = {'quantidade': 0.0, 'custo_total': 0.0, 'preco_medio': 0.0}
             
-        if tipo == 'Credito':
+        if mov == 'Transferência - Liquidação':
+            if tipo == 'Credito':
+                carteira[ticker]['quantidade'] += qtd
+                carteira[ticker]['custo_total'] += valor
+            elif tipo == 'Debito':
+                if carteira[ticker]['quantidade'] > 0:
+                    # Remove o custo proporcional ao preço médio antes de abater a venda
+                    qtd_venda = min(qtd, carteira[ticker]['quantidade'])
+                    carteira[ticker]['custo_total'] -= qtd_venda * carteira[ticker]['preco_medio']
+                carteira[ticker]['quantidade'] -= qtd
+                
+        elif mov == 'Desdobro':
+            # Soma as novas cotas mantendo o custo total intacto
             carteira[ticker]['quantidade'] += qtd
-            carteira[ticker]['custo_total'] += valor
-        elif tipo == 'Debito':
-            if carteira[ticker]['quantidade'] > 0:
-                qtd_venda = min(qtd, carteira[ticker]['quantidade'])
-                carteira[ticker]['custo_total'] -= qtd_venda * carteira[ticker]['preco_medio']
-            carteira[ticker]['quantidade'] -= qtd
             
-        # Recalculo do preço médio dinâmico
+        # Recalculo do preço médio dinâmico da Renda Variável
         if carteira[ticker]['quantidade'] > 0:
             carteira[ticker]['preco_medio'] = carteira[ticker]['custo_total'] / carteira[ticker]['quantidade']
         else:
@@ -100,24 +107,24 @@ try:
             carteira[ticker]['custo_total'] = 0.0
             carteira[ticker]['preco_medio'] = 0.0
             
-        # Guarda o total do bolso investido acumulado neste exato segundo da história
+        # Guarda o somatório do custo total de todos os ativos de Bolsa até esta data
         historico_financeiro.append({
             'Data': data,
             'Custo_Acumulado': sum(d['custo_total'] for d in carteira.values())
         })
         
-    # 6. Agrupamento mensal consolidado para o gráfico
+    # 5. Agrupamento mensal consolidado para o gráfico
     df_hist = pd.DataFrame(historico_financeiro)
     if not df_hist.empty:
         df_hist['AnoMes'] = df_hist['Data'].dt.to_period('M')
         df_portfolio_mensal = df_hist.groupby('AnoMes').last().reset_index()
         df_portfolio_mensal['Mês_Exibição'] = df_portfolio_mensal['AnoMes'].dt.strftime('%m/%Y')
         
-        # Captura o valor final atualizado para alimentar o Cartão de KPI
+        # Alimenta o Cartão do Total Investido apenas com Renda Variável
         total_investido_kpi = float(df_portfolio_mensal.iloc[-1]['Custo_Acumulado'])
 
 except Exception as e:
-    st.error(f"❌ Erro no processamento do gráfico de evolução: {e}")
+    st.error(f"❌ Erro no processamento dos dados de renda variável: {e}")
 
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
@@ -178,21 +185,21 @@ with aba_resumo:
         
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # GRÁFICO INTERATIVO DE EVOLUÇÃO DO VALOR INVESTIDO
+    # GRÁFICO DE LINHA INTERATIVO: APENAS CAPITAL INVESTIDO DE RENDA VARIÁVEL
     if not df_portfolio_mensal.empty:
         fig_evolucao = go.Figure()
         fig_evolucao.add_trace(go.Scatter(
             x=df_portfolio_mensal['Mês_Exibição'], 
             y=df_portfolio_mensal['Custo_Acumulado'],
             mode='lines+markers',
-            name='Total Investido (Bolso)',
+            name='Total Investido (Ações e FIIs)',
             line=dict(color='#118DFF', width=3),
             marker=dict(size=6),
-            hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
+            hovertemplate='<b>Mês:</b> %{x}<br><b>Investido RV:</b> R$ %{y:,.2f}<extra></extra>'
         ))
         
         fig_evolucao.update_layout(
-            title="<b>Evolução Histórica do Capital Investido Acumulado</b>",
+            title="<b>Evolução Histórica do Capital Investido (Renda Variável)</b>",
             title_font=dict(size=15, color='#2C3E50'),
             margin=dict(l=50, r=30, t=50, b=40),
             height=400,
@@ -205,7 +212,7 @@ with aba_resumo:
         )
         st.plotly_chart(fig_evolucao, use_container_width=True)
     else:
-        st.info("Aguardando dados históricos para plotagem.")
+        st.info("Aguardando dados históricos de bolsa para plotagem.")
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
