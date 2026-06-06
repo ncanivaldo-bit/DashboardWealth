@@ -37,7 +37,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# PROCESSAMENTO UNIFICADO - FIEL DOS KPIs AO GRÁFICO
+# PROCESSAMENTO DOS DADOS - ESTRUTURA SEGUIDA À RISCA DO COLAB
 # ==============================================================================
 try:
     # IDs oficiais
@@ -59,73 +59,81 @@ try:
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
-    # Força conversão numérica segura prevenindo #REF! ou nulos
+    # Força conversão numérica segura
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     
     # Filtro cronológico idêntico ao Passo 2 do Colab
     df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização', 'COMPRA / VENDA'])].sort_values('Data').copy()
-    df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
     
-    # --- PROCESSO DE CUSTÓDIA HISTÓRICA COMPACTADA POR MÊS ---
-    meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
-    carteira_controlada = {}
-    historico_carteira_mensal = []
+    carteira = {}
+    historico_detalhado = []
     
-    for am in meses_historicos:
-        df_mes = df_trades[df_trades['AnoMes'] == am]
+    # Execução exata do laço cronológico do Colab
+    for _, row in df_trades.iterrows():
+        ticker = row['Ticker']
+        data = row['Data']
+        mov = row['Movimentação']
+        tipo = str(row['Entrada/Saída']).strip()
+        qtd = float(row['Quantidade'])
+        valor = float(row['Valor da Operação'])
         
-        for _, row in df_mes.iterrows():
-            ticker = row['Ticker']
-            mov = row['Movimentação']
-            tipo = str(row['Entrada/Saída']).strip()
-            qtd = float(row['Quantidade'])
-            valor = float(row['Valor da Operação'])
+        if ticker not in carteira:
+            carteira[ticker] = {'quantidade': 0.0, 'custo_total': 0.0, 'preco_medio': 0.0}
             
-            if ticker not in carteira_controlada:
-                carteira_controlada[ticker] = {'quantidade': 0.0, 'custo_total': 0.0, 'preco_medio': 0.0}
+        if mov in ['Transferência - Liquidação', 'COMPRA / VENDA']:
+            if tipo == 'Credito':
+                carteira[ticker]['quantidade'] += qtd
+                carteira[ticker]['custo_total'] += valor
+            elif tipo == 'Debito':
+                if carteira[ticker]['quantidade'] > 0:
+                    qtd_venda = min(qtd, carteira[ticker]['quantidade'])
+                    carteira[ticker]['custo_total'] -= qtd_venda * carteira[ticker]['preco_medio']
+                carteira[ticker]['quantidade'] -= qtd
                 
-            if mov in ['Transferência - Liquidação', 'COMPRA / VENDA']:
-                if tipo == 'Credito':
-                    carteira_controlada[ticker]['quantidade'] += qtd
-                    carteira_controlada[ticker]['custo_total'] += valor
-                elif tipo == 'Debito':
-                    if carteira_controlada[ticker]['quantidade'] > 0:
-                        qtd_venda = min(qtd, carteira_controlada[ticker]['quantidade'])
-                        carteira_controlada[ticker]['custo_total'] -= qtd_venda * carteira_controlada[ticker]['preco_medio']
-                    carteira_controlada[ticker]['quantidade'] -= qtd
-                    
-            elif mov == 'Desdobro':
-                carteira_controlada[ticker]['quantidade'] += qtd
-                
-            if carteira_controlada[ticker]['quantidade'] > 0:
-                carteira_controlada[ticker]['preco_medio'] = carteira_controlada[ticker]['custo_total'] / carteira_controlada[ticker]['quantidade']
-            else:
-                carteira_controlada[ticker]['quantidade'] = 0.0
-                carteira_controlada[ticker]['custo_total'] = 0.0
-                carteira_controlada[ticker]['preco_medio'] = 0.0
-                
-        # Guarda uma cópia exata do estado da carteira no final deste mês específico
-        for tk, dados in carteira_controlada.items():
-            if dados['quantidade'] > 0:
-                historico_carteira_mensal.append({
-                    'AnoMes': am,
-                    'Chave_Merge': am.strftime('%Y-%m'),
-                    'Ticker': tk,
-                    'Quantidade': dados['quantidade'],
-                    'Custo_Total': dados['custo_total'],
-                    'Preco_Medio': dados['preco_medio']
-                })
-                
-    df_mensal_ativos = pd.DataFrame(historico_carteira_mensal)
-    
-    # 4. BUSCA EXTERNA COM AUTO_ADJUST=FALSE NO YAHOO FINANCE BRUTO
-    df_portfolio_mensal = pd.DataFrame()
-    if not df_mensal_ativos.empty:
+        elif mov == 'Desdobro':
+            carteira[ticker]['quantidade'] += qtd
+            
+        if carteira[ticker]['quantidade'] > 0:
+            carteira[ticker]['preco_medio'] = carteira[ticker]['custo_total'] / carteira[ticker]['quantidade']
+        else:
+            carteira[ticker]['quantidade'] = 0.0
+            carteira[ticker]['custo_total'] = 0.0
+            carteira[ticker]['preco_medio'] = 0.0
+            
+        for tk, dados in carteira.items():
+            historico_detalhado.append({
+                'Data': data,
+                'Ticker': tk,
+                'Quantidade': dados['quantidade'],
+                'Custo_Total': dados['custo_total'],
+                'Preco_Medio': dados['preco_medio']
+            })
+            
+    # 3. Agrupamento mensal resampled por fim de mês ('ME')
+    df_hist_ativos = pd.DataFrame(historico_detalhado)
+    if not df_hist_ativos.empty:
+        df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
+        
+        df_mensal_ativos = (df_hist_ativos
+                            .set_index('Data')
+                            .groupby('Ticker')[['Quantidade', 'Custo_Total', 'Preco_Medio']]
+                            .resample('ME')
+                            .last()
+                            .ffill()
+                            .reset_index())
+        
+        # FILTRO DE SEGURANÇA CONTRA PREENCHIMENTO FANTASMA: Se a quantidade ficou zerada no mês, o custo DEVE ser zero.
+        df_mensal_ativos.loc[df_mensal_ativos['Quantidade'] <= 0, 'Custo_Total'] = 0.0
+        
+        df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
+        df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
+        
+        # 4. BUSCA EXTERNA DE COTAÇÕES (YAHOO FINANCE COM AUTO_ADJUST=FALSE)
         tickers_unicos = df_mensal_ativos['Ticker'].unique()
         precos_mercado_lista = []
-        start_date = df_trades['Data'].min().strftime('%Y-%m-%d')
+        start_date = df_mensal_ativos['Data'].min().strftime('%Y-%m-%d')
         
         for t in tickers_unicos:
             if not t or str(t) == 'nan' or t == 'SPYI11':
@@ -150,7 +158,7 @@ try:
                 
         df_precos = pd.DataFrame(precos_mercado_lista)
         
-        # 5. CRUZAMENTO DOS DADOS (MERGE HISTÓRICO)
+        # 5. CRUZAMENTO DOS DADOS (MERGE)
         if not df_precos.empty:
             df_consolidado = pd.merge(df_mensal_ativos, df_precos, on=['Chave_Merge', 'Ticker'], how='left')
         else:
@@ -161,19 +169,21 @@ try:
         df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Preco_Medio'])
         
-        # 7. CÁLCULO DA VARIAÇÃO E PATRIMÔNIO A MERCADO HISTÓRICO
+        # 7. VALORAÇÃO E AGRUPAMENTO PORTFÓLIO MENSAL
         df_consolidado['Patrimonio_Mercado'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
-        df_portfolio_mensal = df_consolidado.groupby('AnoMes').agg({
+        df_portfolio_mensal = df_consolidado.groupby('Mes_Ano').agg({
             'Custo_Total': 'sum',
             'Patrimonio_Mercado': 'sum'
         }).reset_index()
         
-        df_portfolio_mensal['Mês_Exibição'] = df_portfolio_mensal['AnoMes'].dt.strftime('%m/%Y')
+        df_portfolio_mensal['Mês_Exibição'] = df_portfolio_mensal['Mes_Ano'].dt.strftime('%m/%Y')
+    else:
+        df_portfolio_mensal = pd.DataFrame()
 
-    # --- O GRANDE SEGREDO PARA AMARRAR OS KPIs COMPATÍVEIS: EXTRAIR O ÚLTIMO PONTO REAL ---
+    # --- CÁLCULO DOS VALORES REAIS DO MOMENTO ATUAL PARA OS CARTÕES ---
     linhas_kpi = []
-    for tk, dados in carteira_controlada.items():
+    for tk, dados in carteira.items():
         if dados['quantidade'] > 0:
             linhas_kpi.append({
                 'Ticker': tk, 
@@ -183,20 +193,14 @@ try:
             })
     df_final = pd.DataFrame(linhas_kpi)
     
-    # Cruzamento final real do momento atual com Inf_Ativos
     df_final = pd.merge(df_final, df_inf[['Ticker', 'Preco_Atual', 'Seguimento', 'Classificacao', 'Tipo']], on='Ticker', how='left')
     df_final['Patrimônio Atual'] = df_final['Quantidade'] * df_final['Preco_Atual']
 
-    # --- CÁLCULO INTEGRADO DOS INDICADORES GLOBAIS ATUAIS TRANCADOS ---
+    # Indicadores Absolutos Atuais para os Cards Trancados
     patrimonio_total = df_final['Patrimônio Atual'].sum()
     total_investido = df_final['Total Investido Ativo'].sum()
     ganho_capital = patrimonio_total - total_investido
     
-    # Força o último ponto do gráfico de linha a cravar exatamente o valor oficial de fechamento
-    if not df_portfolio_mensal.empty:
-        df_portfolio_mensal.loc[df_portfolio_mensal.index[-1], 'Patrimonio_Mercado'] = patrimonio_total
-        df_portfolio_mensal.loc[df_portfolio_mensal.index[-1], 'Custo_Total'] = total_investido
-
     df_prov = df_mov[df_mov['Movimentação'].isin(['Rendimento', 'Juros Sobre Capital Próprio'])].copy()
     total_dividendos = df_prov['Valor da Operação'].sum()
     lucro_total = ganho_capital + total_dividendos
@@ -232,7 +236,7 @@ try:
     aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
     
     with aba_resumo:
-        # Linha de KPIs (Totalmente Trancada e Sincronizada com os Gráficos)
+        # Linha de KPIs (Trancada e Pura)
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -283,14 +287,13 @@ try:
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ==============================================================================
-        # GRÁFICOS: 60% EVOLUÇÃO FIEL AO COLAB | 40% ROSCA COM LEG PERCENTUAL LIMPA
+        # GRÁFICOS RECONSTRUÍDOS (60% / 40%)
         # ==============================================================================
         g_col1, g_col2 = st.columns([6, 4])
         
         with g_col1:
             if not df_portfolio_mensal.empty:
                 fig_lin = go.Figure()
-                # Linha do Valor de Mercado Real (Verde) vinda do fechamento cru do Colab
                 fig_lin.add_trace(go.Scatter(
                     x=df_portfolio_mensal['Mês_Exibição'], 
                     y=df_portfolio_mensal['Patrimonio_Mercado'],
@@ -300,7 +303,6 @@ try:
                     marker=dict(size=5),
                     hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
-                # Linha do Total Investido (Azul Tracejado) vinda do acúmulo cronológico puro unificado
                 fig_lin.add_trace(go.Scatter(
                     x=df_portfolio_mensal['Mês_Exibição'], 
                     y=df_portfolio_mensal['Custo_Total'],
@@ -328,7 +330,6 @@ try:
         with g_col2:
             df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
             
-            # Legenda Perfeita: Estritamente Ticker e a porcentagem limpa ao lado direito
             lista_legendas = []
             for _, r_f in df_rosca.iterrows():
                 pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100 if patrimonio_total > 0 else 0.0
