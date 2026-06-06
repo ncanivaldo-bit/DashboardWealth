@@ -159,7 +159,7 @@ try:
         # Se algum ativo antigo não tiver preço no Yahoo em meses remotos, assume o custo amortizado como margem de segurança
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
         
-        # Cálculo do Patrimônio de Mercado do Ponto no Tempo
+        # Calculation of point-in-time equity value
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
         # Consolidação Final Agrupada por Mês
@@ -245,7 +245,7 @@ with aba_resumo:
         # Linha 1: Valor de Mercado (Verde)
         fig_evolucao.add_trace(go.Scatter(
             x=df_portfolio_mensal['Mês_Exibição'], 
-            y=df_portfolio_mensal['Patrimonio_Mercado'],
+            y=df_portfolio_mensal['Patrimonio_Mercado_Ativo'],
             mode='lines+markers',
             name='Valor de Mercado Real B3',
             line=dict(color='#2E8B57', width=3),
