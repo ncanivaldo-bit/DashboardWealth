@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL E REMOÇÃO DOS RECUOS NATIVOS DO STREAMLIT
+# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO COLADO E AJUSTE REFINADO DE ABAS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -29,19 +29,24 @@ st.markdown("""
             max-width: 100% !important;
         }
         
-        /* 3. Oculta os menus e botões da plataforma */
+        /* 3. 🎯 AJUSTADO: Puxa a linha das abas para cima, colando no título PREVPRIV */
+        [data-testid="stTabs"] {
+            margin-top: -25px !important;
+        }
+        
+        /* 4. Oculta os menus e botões da plataforma */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
         
-        /* 4. Esconde o ícone do GitHub no canto superior direito */
+        /* 5. Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# Título direto no topo, colado na aba
+# Título direto no topo
 st.title("PREVPRIV")
 
 # ==============================================================================
@@ -222,8 +227,6 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-# 🎯 Ajustado o respiro sutil entre a linha de abas e os cartões
-st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -306,7 +309,7 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # 🎯 MARGEM INVERSA APLICADA: Puxa o bloco inferior inteiro para cima, comprimindo o espaço vazio
+    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
     st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
 
     # ==============================================================================
@@ -425,7 +428,7 @@ with aba_resumo:
                 st.plotly_chart(fig_pie, use_container_width=True)
             else:
                 st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
-    st.markdown('</div>', unsafe_allow_html=True) # Fecha container de margem inversa
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
