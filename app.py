@@ -27,8 +27,7 @@ def get_drive_service():
 def download_excel_from_drive(file_id, sheet_name=0):
     service = get_drive_service()
     
-    # Como as planilhas agora são nativas do Google Sheets, usamos export_media
-    # para convertê-las em formato de tabela na memória de forma ultra estável
+    # Exportação nativa do Google Sheets estável
     request = service.files().export_media(
         fileId=file_id, 
         mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -46,38 +45,51 @@ def download_excel_from_drive(file_id, sheet_name=0):
 # PROCESSAMENTO DOS DADOS - MOTOR DA MAESTRIA DO COLAB
 # ==============================================================================
 try:
-    # 📝 SEUS NOVOS IDS OFICIAIS DO GOOGLE SHEETS NATIVO
+    # 📝 SEUS IDS OFICIAIS DO GOOGLE SHEETS NATIVO
     ID_MOV = '1jb-uqvlTQ7j07p7akDjYiXew1387VKipXch72x755vM' # Planilha Movimentação
     ID_INF = '1FcBDlaArTQrkYdmDFbqbwObl5qmPy8K2sxxiE0RE8QE' # Planilha Inf_Ativos
     
     # 1. Carrega as tabelas direto do ecossistema nativo
-    df_mov = download_excel_from_drive(ID_MOV, sheet_name=0) # Primeira aba de movimentações
-    df_inf = download_excel_from_drive(ID_INF, sheet_name=0) # Primeira aba de informações estáticas
-    
-    # Download da nova aba de preços históricos que o script do Colab gerou
+    df_mov = download_excel_from_drive(ID_MOV, sheet_name=0) 
+    df_inf = download_excel_from_drive(ID_INF, sheet_name=0) 
     df_precos_historicos = download_excel_from_drive(ID_INF, sheet_name='Hist_Precos')
     
-    # Limpeza preventiva de cabeçalhos
+    # Limpeza profunda e padronização das colunas (Garante resiliência contra erros de maiúsculas/minúsculas)
     df_mov.columns = df_mov.columns.astype(str).str.strip()
     df_inf.columns = df_inf.columns.astype(str).str.strip()
     df_precos_historicos.columns = df_precos_historicos.columns.astype(str).str.strip()
     
+    # Cria um dicionário de mapeamento para forçar colunas críticas a serem encontradas
+    mapeamento_colunas = {col: col.lower().replace('ç', 'c').replace('ã', 'a') for col in df_mov.columns}
+    df_mov_limpo = df_mov.rename(columns=mapeamento_colunas)
+    
+    # Mapeia de volta os nomes internos para o script rodar sem quebrar
+    col_data = [c for c in df_mov.columns if c.lower() == 'data'][0]
+    col_movimentacao = [c for c in df_mov.columns if 'movimentac' in c.lower()][0]
+    col_produto = [c for c in df_mov.columns if 'produto' in c.lower()][0]
+    col_quantidade = [c for c in df_mov.columns if 'quantidad' in c.lower()][0]
+    col_valor = [c for c in df_mov.columns if 'valor' in c.lower()][0]
+    col_sentido = [c for c in df_mov.columns if 'entrada' in c.lower() or 'saida' in c.lower()][0]
+
     # 2. Tratamento de Datas e Extração do Ticker básico
-    df_mov['Data'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
-    df_mov['Ticker'] = df_mov['Produto'].astype(str).str.split(' - ').str[0].str.strip()
+    df_mov['Data_Datetime'] = pd.to_datetime(df_mov[col_data], errors='coerce')
+    df_mov['Ticker'] = df_mov[col_produto].astype(str).str.split(' - ').str[0].str.strip()
     
     # Unifica as mudanças históricas de Ticker (MALL e CVBI)
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
     # Força conversão numérica segura contra strings inválidas
-    df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
-    df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
+    df_mov['Quantidade_Num'] = pd.to_numeric(df_mov[col_quantidade], errors='coerce').fillna(0)
+    df_mov['Valor_Num'] = pd.to_numeric(df_mov[col_valor], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
     
     # 3. Processamento de Custódia e Evolução Cronológica do Portfólio
-    df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização', 'COMPRA / VENDA'])].sort_values('Data').copy()
+    df_trades = df_mov[df_mov[col_movimentacao].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização', 'COMPRA / VENDA'])].sort_values('Data_Datetime').copy()
+    df_trades['AnoMes'] = df_trades['Data_Datetime'].dt.to_period('M')
+    
+    meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
     
     carteira = {}
     historico_detalhado = []
@@ -85,11 +97,11 @@ try:
     # Execução do laço cronológico idêntico ao do Colab para montar o histórico de saldos
     for _, row in df_trades.iterrows():
         ticker = row['Ticker']
-        data = row['Data']
-        mov = row['Movimentação']
-        tipo = str(row['Entrada/Saída']).strip()
-        qtd = float(row['Quantidade'])
-        valor = float(row['Valor da Operação'])
+        data = row['Data_Datetime']
+        mov = row[col_movimentacao]
+        tipo = str(row[col_sentido]).strip()
+        qtd = float(row['Quantidade_Num'])
+        valor = float(row['Valor_Num'])
         
         if ticker not in carteira:
             carteira[ticker] = {'quantidade': 0.0, 'custo_total': 0.0, 'preco_medio': 0.0}
@@ -150,7 +162,7 @@ try:
             df_consolidado['Preco_Mercado'] = np.nan
             
         # Lógica de preenchimento de segurança do Colab (ffill e fallback para o Preço Médio)
-        df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
+        df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Market'] if 'Preco_Market' in df_consolidado.columns else df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Preco_Medio'])
         
         # 5. Cálculo final da evolução de mercado
@@ -185,14 +197,16 @@ try:
     total_investido = df_final['Total Investido Ativo'].sum()
     ganho_capital = patrimonio_total - total_investido
     
-    df_prov = df_mov[df_mov['Movimentação'].isin(['Rendimento', 'Juros Sobre Capital Próprio'])].copy()
-    total_dividendos = df_prov['Valor da Operação'].sum()
+    df_prov = df_mov[df_mov[col_movimentacao].isin(['Rendimento', 'Juros Sobre Capital Próprio'])].copy()
+    df_prov['Valor_Num'] = pd.to_numeric(df_prov[col_valor], errors='coerce').fillna(0)
+    total_dividendos = df_prov['Valor_Num'].sum()
+    
     lucro_total = ganho_capital + total_dividendos
     
-    df_prov['AnoMes'] = df_prov['Data'].dt.to_period('M')
+    df_prov['AnoMes'] = pd.to_datetime(df_prov[col_data], errors='coerce').dt.to_period('M')
     if not df_prov.empty:
-        ultimo_mes_valido = df_prov.sort_values('Data')['AnoMes'].iloc[-1]
-        ultimo_provento_mensal = df_prov[df_prov['AnoMes'] == ultimo_mes_valido]['Valor da Operação'].sum()
+        ultimo_mes_valido = df_prov.sort_values('AnoMes')['AnoMes'].iloc[-1]
+        ultimo_provento_mensal = df_prov[df_prov['AnoMes'] == ultimo_mes_valido]['Valor_Num'].sum()
         str_mes_prov = ultimo_mes_valido.strftime('%m/%Y')
     else:
         ultimo_provento_mensal = 0.0
@@ -220,7 +234,7 @@ try:
     aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
     
     with aba_resumo:
-        # Linha de KPIs (Intacta e Perfeita)
+        # Linha de KPIs (Totalmente Intacta)
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -278,7 +292,7 @@ try:
         with g_col1:
             if not df_portfolio_mensal.empty:
                 fig_lin = go.Figure()
-                # Linha Verde de Mercado com os fechamentos históricos crus da nova aba
+                # Linha Verde de Mercado
                 fig_lin.add_trace(go.Scatter(
                     x=df_portfolio_mensal['Mês_Exibição'], 
                     y=df_portfolio_mensal['Patrimonio_Mercado'],
