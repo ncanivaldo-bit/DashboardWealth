@@ -14,21 +14,24 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA ELIMINAR O TOPO, RECUOS INÚTEIS E ESPAÇAMENTOS ENTRE ELEMENTOS
+# 🎯 INJEÇÃO CSS PARA CASAMENTO PERFEITO NA LARGURA DA TELA E COMPRESSÃO DOS CARTÕES
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
         
-        /* 2. Zera cirurgicamente o recuo gigante do topo da página principal */
+        /* 2. Zera o recuo superior e FORÇA O PREENCHIMENTO TOTAL DA LARGURA DA TELA (Full Width) */
         [data-testid="stMainBlockContainer"] {
             padding-top: 1rem !important;
             padding-bottom: 1rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            max-width: 100% !important; /* Estica o painel de ponta a ponta na horizontal */
         }
         
         /* 3. Comprime o espaço vertical entre blocos e linhas do Streamlit */
         [data-testid="stVerticalBlock"] {
-            gap: 0.5rem !important;
+            gap: 0.4rem !important;
         }
         
         /* 4. Ajusta a margem do título principal */
@@ -231,6 +234,7 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
+st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -250,62 +254,65 @@ with aba_resumo:
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        # 🎯 CARD 1 COMPACTADO (min-height reduzido para 110px e padding reduzido para 10px)
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
+                <div style="color: #2C3E50; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(patrimonio_mercado_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
                     <span>Total Investido: <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong></span>
-                    <span>Var: <strong style="color: {color_var}; font-size: 12px;">{formatar_pct(variacao_carteira_pct)}</strong></span>
+                    <span>Var: <strong style="color: {color_var}; font-size: 11.5px;">{formatar_pct(variacao_carteira_pct)}</strong></span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col2:
+        # 🎯 CARD 2 COMPACTADO
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
-                <div style="color: {color_lucro}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(lucro_total_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
+                <div style="color: {color_lucro}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(lucro_total_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <div style="font-size: 9px; text-transform: uppercase; color: #7F8C8D; line-height: 1.1;">Ganho de Capital</div>
-                        <div style="color: {color_ganho}; font-weight: bold; font-size: 12px; margin-top: 2px;">{formatar_br(ganho_capital_kpi)}</div>
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">G. Cap:</span>
+                        <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-size: 9px; text-transform: uppercase; color: #7F8C8D; line-height: 1.1;">Dividendos Recebidos</div>
-                        <div style="color: #2E8B57; font-weight: bold; font-size: 12px; margin-top: 2px;">{formatar_br(total_dividendos)}</div>
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Prov:</span>
+                        <strong style="color: #2E8B57;">{formatar_br(total_dividendos)}</strong>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col3:
+        # 🎯 CARD 3 COMPACTADO
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
-                <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(ult_provento_val)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
+                <div style="color: #2E8B57; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(ult_provento_val)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D;">
                     Mês de Referência: <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col4:
+        # 🎯 CARD 4 COMPACTADO
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
-                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
-                <div style="color: {color_rent}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_pct(rentabilidade_total_pct)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
+                <div style="color: {color_rent}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_pct(rentabilidade_total_pct)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D;">
                     Resultado Comercial: <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-    # 🎯 Removido o espaçador <br> daqui e ajustada a linha divisória com margens mínimas para colar os blocos
     st.markdown("<hr style='margin: 4px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
     # ==============================================================================
-    # BLOCOS GRÁFICOS PARALELOS (60% / 40%) - ENQUADRAMENTO COMPACTADO NATAL
+    # BLOCOS GRÁFICOS PARALELOS (60% / 40%) - ESTICADOS NA LARGURA TOTAL
     # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
