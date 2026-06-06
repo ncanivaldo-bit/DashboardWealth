@@ -222,6 +222,8 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
+# 🎯 AJUSTADO: Reduzido o espaço entre a linha das abas e os cartões para 2px
+st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -304,8 +306,8 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # Espaçador controlado entre cartões e gráficos
-    st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+    # 🎯 AJUSTADO: Reduzido o espaço entre os cartões e os gráficos para 8px (vão pequeno, sem grudar)
+    st.markdown('<div style="margin-top: 8px;"></div>', unsafe_allow_html=True)
 
     # ==============================================================================
     # BLOCOS GRÁFICOS PARALELOS EQUALIZADOS (60% / 40%) - SIMETRIA TOTAL
@@ -353,7 +355,6 @@ with aba_resumo:
                     hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
-                # 🎯 AJUSTADO: height alterado para 260 e tickformat configurado para escala limpa (ex: 50k, 100k, 250k)
                 fig_barras.update_layout(
                     margin=dict(l=45, r=10, t=10, b=10),
                     height=260, 
@@ -365,8 +366,8 @@ with aba_resumo:
                     yaxis=dict(
                         gridcolor='rgba(230,235,240,0.6)', 
                         tickprefix="R$ ", 
-                        tickformat="~s",  # Transforma números em notações compactas como '200k' automaticamente
-                        nticks=6          # Organiza as linhas de grade para evitar poluição
+                        tickformat="~s",  
+                        nticks=6          
                     ),
                     xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
                     legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
@@ -407,7 +408,6 @@ with aba_resumo:
                     hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
                 
-                # 🎯 AJUSTADO: height reduzido de 280 para 260 para casar milimetricamente com a altura da esquerda
                 fig_pie.update_layout(
                     margin=dict(l=0, r=0, t=10, b=10),
                     height=260, 
