@@ -188,117 +188,117 @@ with aba_resumo:
 
     st.markdown("<br><hr style='margin: 10px 0; border-color: #ECEFF1;'><br>", unsafe_allow_html=True)
 
-    # 🏁 LAYOUT DIVIDIDO EM COMPARTIMENTOS CRUOS 60% / 40% LADO A LADO
+    # 🏁 LAYOUT GRID DIVIDIDO EM 60% / 40%
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
     with col_bloco_esquerdo:
-        # 🏢 Cabecalho Alinhado: Titulo e Filtro de Ano lado a lado (Sem Legenda Superior)
-        col_t1, col_f1 = st.columns([7, 3])
-        with col_t1:
-            st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:20px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
-        with col_f1:
-            anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
-            filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
-            
-        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        # 🎯 O st.container(border=True) cria a borda suave contornando todo o conjunto (título + filtro + gráfico)
+        with st.container(border=True):
+            col_t1, col_f1 = st.columns([7, 3])
+            with col_t1:
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
+            with col_f1:
+                anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
+                filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
+                
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-        # Filtro de data associado exclusivamente ao historico
-        df_filtrado_grafico = df_consolidado.copy()
-        if filtro_ano != "Desde o início":
-            df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
+            df_filtrado_grafico = df_consolidado.copy()
+            if filtro_ano != "Desde o início":
+                df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
 
-        if not df_filtrado_grafico.empty:
-            df_totais_mensais = df_filtrado_grafico.groupby('Mes_Ano').agg({
-                'Custo_Total': 'sum',
-                'Patrimonio_Mercado_Ativo': 'sum'
-            }).reset_index().sort_values('Mes_Ano')
-            
-            df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
-            df_totais_mensais['Valor_Aplicado'] = df_totais_mensais['Custo_Total']
-            df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] - df_totais_mensais['Custo_Total']
+            if not df_filtrado_grafico.empty:
+                df_totais_mensais = df_filtrado_grafico.groupby('Mes_Ano').agg({
+                    'Custo_Total': 'sum',
+                    'Patrimonio_Mercado_Ativo': 'sum'
+                }).reset_index().sort_values('Mes_Ano')
+                
+                df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
+                df_totais_mensais['Valor_Aplicado'] = df_totais_mensais['Custo_Total']
+                df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] - df_totais_mensais['Custo_Total']
 
-            fig_barras = go.Figure()
-            fig_barras.add_trace(go.Bar(
-                x=df_totais_mensais['Mês_Exibição'], 
-                y=df_totais_mensais['Valor_Aplicado'],
-                name='Valor aplicado',
-                marker_color='#1fbc74', 
-                hovertemplate='<b>Aplicado:</b> R$ %{y:,.2f}<extra></extra>'
-            ))
-            fig_barras.add_trace(go.Bar(
-                x=df_totais_mensais['Mês_Exibição'], 
-                y=df_totais_mensais['Ganho_de_Capital'],
-                name='Ganho de Capital',
-                marker_color='#7ee0b3',
-                hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
-            ))
-            
-            fig_barras.update_layout(
-                margin=dict(l=40, r=10, t=10, b=10),
-                height=310, # Mantém achatado
-                barmode='relative',
-                bargap=0.2,
-                hovermode='x unified',
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
-                xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
-                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
-            )
-            st.plotly_chart(fig_barras, use_container_width=True)
+                fig_barras = go.Figure()
+                fig_barras.add_trace(go.Bar(
+                    x=df_totais_mensais['Mês_Exibição'], 
+                    y=df_totais_mensais['Valor_Aplicado'],
+                    name='Valor aplicado',
+                    marker_color='#1fbc74', 
+                    hovertemplate='<b>Aplicado:</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                fig_barras.add_trace(go.Bar(
+                    x=df_totais_mensais['Mês_Exibição'], 
+                    y=df_totais_mensais['Ganho_de_Capital'],
+                    name='Ganho de Capital',
+                    marker_color='#7ee0b3',
+                    hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                
+                fig_barras.update_layout(
+                    margin=dict(l=35, r=5, t=10, b=10),
+                    height=280, # Leve ajuste para compensar o respiro interno da borda nativa
+                    barmode='relative',
+                    bargap=0.2,
+                    hovermode='x unified',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
+                    xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
+                )
+                st.plotly_chart(fig_barras, use_container_width=True)
 
     with col_bloco_direito:
-        # 🏢 Cabecalho Alinhado: Titulo e Filtro de Ativos lado a lado (Sem Legenda Superior)
-        col_t2, col_f2 = st.columns([6, 4])
-        with col_t2:
-            st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:20px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
-        with col_f2:
-            tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique()))
-            filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
-            
-        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        # 🎯 O mesmo st.container(border=True) envelopando a rosca de ativos com o contorno suave
+        with st.container(border=True):
+            col_t2, col_f2 = st.columns([6, 4])
+            with col_t2:
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
+            with col_f2:
+                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique()))
+                filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
+                
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-        # Filtro de tipo de ativo associado exclusivamente à rosca de hoje
-        df_rosca_filtrada = df_custodia_atual.copy()
-        if filtro_tipo != "Todos os tipos":
-            df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
+            df_rosca_filtrada = df_custodia_atual.copy()
+            if filtro_tipo != "Todos os tipos":
+                df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
 
-        if not df_rosca_filtrada.empty:
-            df_rosca = df_rosca_filtrada.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
-            
-            labels_legendas = []
-            total_mercado_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
-            for _, row_r in df_rosca.iterrows():
-                pct = (row_r['Patrimonio_Mercado_Ativo'] / total_mercado_rosca) * 100 if total_mercado_rosca > 0 else 0.0
-                labels_legendas.append(f"<b>{row_r['Ticker']}</b> ({pct:.1f}%)")
-            
-            fig_pie = go.Figure()
-            fig_pie.add_trace(go.Pie(
-                labels=labels_legendas, 
-                values=df_rosca['Patrimonio_Mercado_Ativo'],
-                hole=0.55,
-                domain=dict(x=[0.0, 0.65]), # Zoom reduzido ideal
-                textinfo='none',
-                hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
-            ))
-            
-            fig_pie.update_layout(
-                margin=dict(l=0, r=0, t=10, b=10),
-                height=310, # Alinhado simetricamente na mesma altura das barras
-                paper_bgcolor='rgba(0,0,0,0)',
-                showlegend=True,
-                legend=dict(
-                    orientation="v", 
-                    yanchor="middle", 
-                    y=0.5, 
-                    xanchor="left", 
-                    x=0.70,
-                    font=dict(size=11)
+            if not df_rosca_filtrada.empty:
+                df_rosca = df_rosca_filtrada.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
+                
+                labels_legendas = []
+                total_mercado_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
+                for _, row_r in df_rosca.iterrows():
+                    pct = (row_r['Patrimonio_Mercado_Ativo'] / total_mercado_rosca) * 100 if total_mercado_rosca > 0 else 0.0
+                    labels_legendas.append(f"<b>{row_r['Ticker']}</b> ({pct:.1f}%)")
+                
+                fig_pie = go.Figure()
+                fig_pie.add_trace(go.Pie(
+                    labels=labels_legendas, 
+                    values=df_rosca['Patrimonio_Mercado_Ativo'],
+                    hole=0.55,
+                    domain=dict(x=[0.0, 0.65]),
+                    textinfo='none',
+                    hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
+                ))
+                
+                fig_pie.update_layout(
+                    margin=dict(l=0, r=0, t=10, b=10),
+                    height=280, # Alinhado simetricamente com a mesma altura das barras
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    showlegend=True,
+                    legend=dict(
+                        orientation="v", 
+                        yanchor="middle", 
+                        y=0.5, 
+                        xanchor="left", 
+                        x=0.68,
+                        font=dict(size=10)
+                    )
                 )
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-        else:
-            st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
