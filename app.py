@@ -1,4 +1,4 @@
-import streamlit st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import json
@@ -241,7 +241,6 @@ with aba_resumo:
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # 🎯 CARD 1 - Totalmente reconstruído e equalizado com o padrão exato dos outros três
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
@@ -305,7 +304,7 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # 🎯 LINHA REMOVIDA DAQUI: Criado um espaçador controlado de 15px para descolar os blocos com elegância
+    # Criado um espaçador controlado de 15px para descolar os blocos com elegância
     st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
     # ==============================================================================
@@ -319,13 +318,13 @@ with aba_resumo:
             with col_t1:
                 st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
             with col_f1:
-                anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True) if not df_consolidado.empty else ["Desde o início"]
+                anos_disponiveis = ["Permanente"] if df_consolidado.empty else ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
                 filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
                 
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             df_filtrado_grafico = df_consolidado.copy()
-            if filtro_ano != "Desde o início" and not df_filtrado_grafico.empty:
+            if filtro_ano != "Desde o início" and filtro_ano != "Permanente" and not df_filtrado_grafico.empty:
                 df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
 
             if not df_filtrado_grafico.empty:
@@ -374,7 +373,7 @@ with aba_resumo:
             with col_t2:
                 st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
             with col_f2:
-                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidated['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
+                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
                 
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
