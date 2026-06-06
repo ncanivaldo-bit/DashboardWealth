@@ -48,9 +48,10 @@ def download_excel_from_drive(file_id, sheet_name=0):
             time.sleep(1)
 
 # ==============================================================================
-# MOTOR MATRICIAL - PROCESSAMENTO DOS DADOS ORIGINAL
+# MOTOR MATRICIAL CACHEADO (O segredo da velocidade instantânea)
 # ==============================================================================
-try:
+@st.cache_data(ttl=600)  # Guarda os dados na memória por 10 minutos para evitar downloads repetidos
+def carregar_e_processar_dados_carteira():
     ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
     
     df_mov = download_excel_from_drive(ID_UNIFICADO, sheet_name='Movimentacao')
@@ -153,11 +154,18 @@ try:
         df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
         df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
         
-        total_investido_kpi = float(df_custodia_atual['Custo_Total'].sum())
-        patrimonio_mercado_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
+        return df_consolidado, df_custodia_atual
+    return pd.DataFrame(), pd.DataFrame()
 
-except Exception as e:
-    st.error(f"❌ Erro crítico no motor de cálculo: {e}")
+# Executa a função cacheada de alta velocidade
+df_consolidado, df_custodia_atual = carregar_e_processar_dados_carteira()
+
+# Cálculo dinâmico das variáveis globais dos cards
+total_investido_kpi = 0.0
+patrimonio_mercado_kpi = 0.0
+if not df_custodia_atual.empty:
+    total_investido_kpi = float(df_custodia_atual['Custo_Total'].sum())
+    patrimonio_mercado_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
 
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
@@ -186,10 +194,9 @@ with aba_resumo:
     with col4:
         st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold;">RENTABILIDADE</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">0.00%</div></div>""", unsafe_allow_html=True)
 
-    # Reduzi a margem da linha divisória para comprimir o espaço vertical
     st.markdown("<hr style='margin: 5px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
-    # 🏢 LINHA DE CONTROLADORES DE FILTRO (Margem reduzida para colar nos gráficos)
+    # 🏢 LINHA DE CONTROLADORES DE FILTRO
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
     with col_bloco_esquerdo:
@@ -198,13 +205,13 @@ with aba_resumo:
             with col_t1:
                 st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
             with col_f1:
-                anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True)
+                anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True) if not df_consolidado.empty else ["Desde o início"]
                 filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
                 
             st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
             df_filtrado_grafico = df_consolidado.copy()
-            if filtro_ano != "Desde o início":
+            if filtro_ano != "Desde o início" and not df_filtrado_grafico.empty:
                 df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
 
             if not df_filtrado_grafico.empty:
@@ -253,13 +260,13 @@ with aba_resumo:
             with col_t2:
                 st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
             with col_f2:
-                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique()))
+                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
                 
             st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
             df_rosca_filtrada = df_custodia_atual.copy()
-            if filtro_tipo != "Todos os tipos":
+            if filtro_tipo != "Todos os tipos" and not df_rosca_filtrada.empty:
                 df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
 
             if not df_rosca_filtrada.empty:
