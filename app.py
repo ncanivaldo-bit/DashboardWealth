@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st
 import pandas as pd
 import numpy as np
 import json
@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL E AJUSTES DE ESPAÇAMENTO DO TOPO
+# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL E REMOÇÃO DOS RECUOS NATIVOS DO STREAMLIT
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -22,8 +22,8 @@ st.markdown("""
         
         /* 2. Zera o recuo superior e força o preenchimento total da largura da tela */
         [data-testid="stMainBlockContainer"] {
-            padding-top: 1rem !important;
-            padding-bottom: 1rem !important;
+            padding-top: 0.8rem !important;
+            padding-bottom: 0.8rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
             max-width: 100% !important;
@@ -41,6 +41,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Título direto no topo, colado na aba
 st.title("PREVPRIV")
 
 # ==============================================================================
@@ -221,7 +222,6 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
@@ -238,12 +238,10 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
-    # CONTAINER DOS CARTÕES: margin-bottom negativa puxa apenas a linha dos cartões ligeiramente para cima
-    st.markdown('<div style="margin-bottom: -10px;">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # 🎯 CARD 1 - Totalmente equalizado em HTML/CSS com os outros três (Simetria perfeita de tamanho)
+        # 🎯 CARD 1 - Totalmente reconstruído e equalizado com o padrão exato dos outros três
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
@@ -255,7 +253,7 @@ with aba_resumo:
                     </div>
                     <div style="text-align: right;">
                         <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Var:</span>
-                        <strong style="color: {color_var}; font-size: 11.5px;">{formatar_pct(variacao_carteira_pct)}</strong>
+                        <strong style="color: {color_var};">{formatar_pct(variacao_carteira_pct)}</strong>
                     </div>
                 </div>
             </div>
@@ -286,7 +284,7 @@ with aba_resumo:
                 <div style="color: #2E8B57; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(ult_provento_val)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Ref:</span>
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Mês de Ref:</span>
                         <strong style="color: #34495E;">{ult_provento_mes}</strong>
                     </div>
                 </div>
@@ -300,19 +298,15 @@ with aba_resumo:
                 <div style="color: {color_rent}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_pct(rentabilidade_total_pct)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Comercial:</span>
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Resultado Com:</span>
                         <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True) # Fecha container dos cartões
 
-    # Linha divisória fina tradicional
-    st.markdown("<hr style='margin: 2px 0 2px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
-
-    # 🎯 ESPAÇADOR CONTROLADO DA LINHA DOS GRÁFICOS: Garante que os gráficos fiquem parados enquanto os cartões sobem
-    st.markdown('<div style="margin-top: 16px;"></div>', unsafe_allow_html=True)
+    # 🎯 LINHA REMOVIDA DAQUI: Criado um espaçador controlado de 15px para descolar os blocos com elegância
+    st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
     # ==============================================================================
     # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
@@ -380,7 +374,7 @@ with aba_resumo:
             with col_t2:
                 st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
             with col_f2:
-                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
+                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidated['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
                 
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
