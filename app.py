@@ -45,46 +45,33 @@ try:
     ID_MOV = '1JJPFCTWORXmTBJB3KdtKK-LRf-3A8XIAESWRiOX-G4E' # Movimentação
     ID_INF = '1FcBDlaArTQrkYdmDFbqbwObl5qmPy8K2sxxiE0RE8QE' # Inf_Ativos
     
-    # 1. Carrega as tabelas brutas
+    # 1. Carrega as tabelas brutas do Google Sheets
     df_mov = download_excel_from_drive(ID_MOV, sheet_name=0) 
     df_inf = download_excel_from_drive(ID_INF, sheet_name=0) 
     df_precos_historicos = download_excel_from_drive(ID_INF, sheet_name='Hist_Precos')
     
-    # --- AUTO-DETECÇÃO DE CABEÇALHO REAL (Evita linhas em branco ou lixo no topo) ---
-    for i in range(min(5, len(df_mov))):
-        colunas_teste = [str(c).strip().lower() for c in df_mov.columns]
-        if 'data' in colunas_teste or 'movimentação' in colunas_teste or 'produto' in colunas_teste:
-            break # Encontrou o cabeçalho real na linha correta!
-        # Se não encontrou, promove a primeira linha a cabeçalho e tenta de novo
-        df_mov.columns = df_mov.iloc[0].astype(str).str.strip()
-        df_mov = df_mov[1:].reset_index(drop=True)
-
-    # Limpeza final de cabeçalhos
+    # Limpeza preventiva de cabeçalhos contra espaços fantasmas nas pontas
     df_mov.columns = df_mov.columns.astype(str).str.strip()
     df_inf.columns = df_inf.columns.astype(str).str.strip()
     df_precos_historicos.columns = df_precos_historicos.columns.astype(str).str.strip()
     
-    # Verificação de emergência: se falhar o mapeamento, joga as colunas na tela em vez de quebrar tudo
-    try:
-        col_data = [c for c in df_mov.columns if c.lower() == 'data'][0]
-        col_movimentacao = [c for c in df_mov.columns if 'movimentac' in c.lower()][0]
-        col_produto = [c for c in df_mov.columns if 'produto' in c.lower()][0]
-        col_quantidade = [c for c in df_mov.columns if 'quantidad' in c.lower()][0]
-        col_valor = [c for c in df_mov.columns if 'valor' in c.lower()][0]
-        col_sentido = [c for c in df_mov.columns if 'entrada' in c.lower() or 'saida' in c.lower()][0]
-    except IndexError:
-        st.error("⚠️ Não foi possível mapear as colunas padrão de Movimentação automaticamente.")
-        st.write("As colunas interpretadas pelo Python foram:", list(df_mov.columns))
-        st.write("Confira as primeiras linhas extraídas:", df_mov.head(3))
-        st.stop()
+    # Mapeamento fixo e cravado com base na leitura real da planilha (image_014de7.png)
+    col_data = 'Data'
+    col_movimentacao = 'Movimentação'
+    col_produto = 'Produto'
+    col_quantidade = 'Quantidade'
+    col_valor = 'Valor da Operação'
+    col_sentido = 'Entrada/Saída'
 
     # 2. Tratamento de Datas e Extração do Ticker básico
     df_mov['Data_Datetime'] = pd.to_datetime(df_mov[col_data], format='%d/%m/%Y', errors='coerce')
     df_mov['Ticker'] = df_mov[col_produto].astype(str).str.split(' - ').str[0].str.strip()
     
+    # Alinhamento de históricos de transição de tickers
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
+    # Conversão numérica limpa e protegida
     df_mov['Quantidade_Num'] = pd.to_numeric(df_mov[col_quantidade], errors='coerce').fillna(0)
     df_mov['Valor_Num'] = pd.to_numeric(df_mov[col_valor], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
@@ -153,7 +140,7 @@ try:
         df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
         df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
         
-        # 4. CRUZAMENTO COM A BASE HISTÓRICA DO DRIVE
+        # 4. Cruzamento direto com a tabela de preços gerada no Colab
         if not df_precos_historicos.empty:
             df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
         else:
@@ -163,7 +150,7 @@ try:
         df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Preco_Medio'])
         
-        # 5. Cálculo da evolução de mercado
+        # 5. Fechamento do cálculo patrimonial mensal
         df_consolidado['Patrimonio_Mercado'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
         df_portfolio_mensal = df_consolidado.groupby('Mes_Ano').agg({
@@ -175,7 +162,7 @@ try:
     else:
         df_portfolio_mensal = pd.DataFrame()
 
-    # --- CÁLCULO DOS CARDS DE KPI (MOMENTO ATUAL REAL) ---
+    # --- CÁLCULO FINANCEIRO MOMENTO ATUAL REAIS (Cards) ---
     linhas_kpi = []
     for tk, dados in carteira.items():
         if dados['quantidade'] > 0:
@@ -190,7 +177,6 @@ try:
     df_final = pd.merge(df_final, df_inf[['Ticker', 'Preco_Atual', 'Seguimento', 'Classificacao', 'Tipo']], on='Ticker', how='left')
     df_final['Patrimônio Atual'] = df_final['Quantidade'] * df_final['Preco_Atual']
 
-    # Indicadores absolutos nos cards
     patrimonio_total = df_final['Patrimônio Atual'].sum()
     total_investido = df_final['Total Investido Ativo'].sum()
     ganho_capital = patrimonio_total - total_investido
@@ -212,7 +198,7 @@ try:
 
     rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
 
-    # Estilização padrão monetário Brasil
+    # Conversão Monetária para o padrão PT-BR
     def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     str_patrimonio = formatar_br(patrimonio_total)
     str_investido = formatar_br(total_investido)
@@ -226,12 +212,13 @@ try:
     cor_rent = "#2E8B57" if rentabilidade_pct >= 0 else "#E74C3C"
 
     # ==============================================================================
-    # RENDERIZAÇÃO DAS ABAS
+    # RENDERIZAÇÃO INTERFACE STREAMLIT
     # ==============================================================================
     st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
     aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
     
     with aba_resumo:
+        # Linha de Indicadores
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -282,7 +269,7 @@ try:
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ==============================================================================
-        # GRÁFICOS: 60% EVOLUÇÃO | 40% ROSCA COM PERCENTUAIS
+        # GRÁFICOS PARALELOS (60% EVOLUÇÃO / 40% DISTRIBUIÇÃO)
         # ==============================================================================
         g_col1, g_col2 = st.columns([6, 4])
         
