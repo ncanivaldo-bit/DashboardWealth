@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO COLADO E AJUSTE REFINADO DE ABAS
+# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO ABSOLUTO E AJUSTE REFINADO DE ABAS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -29,18 +29,26 @@ st.markdown("""
             max-width: 100% !important;
         }
         
-        /* 3. 🎯 AJUSTADO: Puxa a linha das abas para cima, colando no título PREVPRIV */
+        /* 3. Puxa a linha das abas para cima, colando no título PREVPRIV */
         [data-testid="stTabs"] {
             margin-top: -25px !important;
         }
         
-        /* 4. Oculta os menus e botões da plataforma */
+        /* 4. 🎯 AJUSTADO: Cola o título "PREVPRIV" no topo absoluto do navegador */
+        h1 { 
+            margin-top: -25px !important; 
+            margin-bottom: 5px !important; 
+            font-size: 26px !important; 
+            font-weight: 700 !important;
+        }
+        
+        /* 5. Oculta os menus e botões da plataforma */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
         
-        /* 5. Esconde o ícone do GitHub no canto superior direito */
+        /* 6. Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
     </style>
@@ -227,6 +235,7 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
+st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
