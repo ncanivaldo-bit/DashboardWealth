@@ -350,11 +350,16 @@ with aba_resumo:
                 df_totais_mensais['Valor_Aplicado'] = df_totais_mensais['Custo_Total']
                 df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] - df_totais_mensais['Custo_Total']
 
+                # 🎯 CÁLCULO DINÂMICO DOS LIMITES: Encontra o menor e o maior valor histórico para o Eixo Y respirar livremente
+                menor_valor_historico = float(df_totais_mensais['Ganho_de_Capital'].min())
+                limite_inferior_eixo = menor_valor_historico * 1.2 if menor_valor_historico < 0 else menor_valor_historico - 5000
+                limite_superior_eixo = patrimonio_mercado_kpi * 1.15
+
                 fig_barras = go.Figure()
                 fig_barras.add_trace(go.Bar(
                     x=df_totais_mensais['Mês_Exibição'], 
                     y=df_totais_mensais['Valor_Aplicado'],
-                    name='Valor aplicado',
+                    name='Valor applied',
                     marker_color='#1fbc74', 
                     hovertemplate='<b>Aplicado:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
@@ -366,7 +371,7 @@ with aba_resumo:
                     hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
-                # 🎯 AJUSTADO: t=25 dá o respiro interno para afastar a legenda, range dinâmico calcula o topo real baseado no seu patrimônio atual e y=1.12 afasta os textos das barras.
+                # 🎯 CORRIGIDO: range=[limite_inferior_eixo, limite_superior_eixo] abre espaço para o subsolo negativo aparecer livremente
                 fig_barras.update_layout(
                     margin=dict(l=45, r=10, t=25, b=10),
                     height=260, 
@@ -380,7 +385,7 @@ with aba_resumo:
                         tickprefix="R$ ", 
                         tickformat="~s",  
                         nticks=6,
-                        range=[0, patrimonio_mercado_kpi * 1.15] # Ajusta dinamicamente a escala para ir muito além de 200k
+                        range=[limite_inferior_eixo, limite_superior_eixo]
                     ),
                     xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
                     legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="center", x=0.5)
