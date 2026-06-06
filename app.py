@@ -126,10 +126,20 @@ def carregar_e_processar_dados_carteira():
                 'Custo_Total': dados['custo_total']
             })
             
-    # 2. Extração de Dividendos Totais da história
+    # 2. Extração de Dividendos Totais e Cálculo do Último Mês Pago
     termos_proventos = ['Dividendo', 'JCP', 'Rendimento', 'Provento']
-    df_proventos = df_mov[df_mov['Movimentação'].isin(termos_proventos)]
+    df_proventos = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     total_dividendos_historico = float(df_proventos['Valor da Operação'].sum())
+    
+    # Processamento para descobrir o último mês de proventos consolidados
+    ultimo_provento_valor = 0.0
+    ultimo_provento_mes_ano = "-"
+    if not df_proventos.empty and not df_proventos['Data_Datetime'].isna().all():
+        df_proventos['AnoMes'] = df_proventos['Data_Datetime'].dt.to_period('M')
+        proventos_por_mes = df_proventos.groupby('AnoMes')['Valor da Operação'].sum().sort_index()
+        if not proventos_por_mes.empty:
+            ultimo_provento_valor = float(proventos_por_mes.iloc[-1])
+            ultimo_provento_mes_ano = proventos_por_mes.index[-1].strftime('%m/%Y')
 
     df_hist_ativos = pd.DataFrame(historico_detalhado)
     if not df_hist_ativos.empty:
@@ -160,23 +170,33 @@ def carregar_e_processar_dados_carteira():
         df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
         df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
         
-        return df_consolidado, df_custodia_atual, total_dividendos_historico
-    return pd.DataFrame(), pd.DataFrame(), 0.0
+        return df_consolidado, df_custodia_atual, total_dividendos_historico, ultimo_provento_valor, ultimo_provento_mes_ano
+    return pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
 
 # Execução do Motor de Inteligência
-df_consolidado, df_custodia_atual, total_dividendos = carregar_e_processar_dados_carteira()
+df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = carregar_e_processar_dados_carteira()
 
-# Cálculo das Métricas dos Cartões
+# Inicialização padrão de variáveis matemáticas
 total_investido_kpi = 0.0
 patrimonio_mercado_kpi = 0.0
 ganho_capital_kpi = 0.0
 lucro_total_kpi = 0.0
+variacao_carteira_pct = 0.0
+rentabilidade_total_pct = 0.0
 
 if not df_custodia_atual.empty:
     total_investido_kpi = float(df_custodia_atual['Custo_Total'].sum())
     patrimonio_mercado_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
+    
+    # Cálculos Avançados das Métricas
     ganho_capital_kpi = patrimonio_mercado_kpi - total_investido_kpi
     lucro_total_kpi = ganho_capital_kpi + total_dividendos
+    
+    if total_investido_kpi > 0:
+        # Variação Patrimonial pura (Preço Médio vs Preço Atual)
+        variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
+        # Rentabilidade Estratégica incluindo a Alavanca dos Dividendos (Retorno Total)
+        rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
@@ -185,53 +205,84 @@ st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
-    # Formatação Padrão Monetária BR
+    # Formatações Padrão de Moeda e Sinais BR
     def formatar_br(v):
         prefixo = "-" if v < 0 else ""
         return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         
+    def formatar_pct(v):
+        prefixo = "+" if v > 0 else ""
+        return f"{prefixo}{v:.2f}%".replace('.', ',')
+
+    # Determinação das cores condicionais dinâmicas (Verde se >= 0, Vermelho se < 0)
     color_lucro = "#2E8B57" if lucro_total_kpi >= 0 else "#CD5C5C"
     color_ganho = "#2E8B57" if ganho_capital_kpi >= 0 else "#CD5C5C"
+    color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
+    color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
     col1, col2, col3, col4 = st.columns(4)
+    
     with col1:
+        # 🎯 CARD 1: PATRIMÔNIO ATUAL (Com acréscimo da variação colorida no rodapé)
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
                 <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
-                    Total Investido: <span style="color: #118DFF; font-weight:bold;">{formatar_br(total_investido_kpi)}</span>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Total Investido: <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong></span>
+                    <span>Var: <strong style="color: {color_var}; font-size: 12px;">{formatar_pct(variacao_carteira_pct)}</strong></span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col2:
-        # 🎯 MONTAGEM EXATA DO MODELO SOLICITADO (image_d44165.png)
+        # 🎯 CARD 2: LUCRO TOTAL
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
                 <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
                 <div style="color: {color_lucro}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(lucro_total_kpi)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <div style="font-size: 10px; text-transform: uppercase; color: #7F8C8D;">Ganho de Capital</div>
-                        <div style="color: {color_ganho}; font-weight: bold; font-size: 12px;">{formatar_br(ganho_capital_kpi)}</div>
+                        <div style="font-size: 9px; text-transform: uppercase; color: #7F8C8D; line-height: 1.1;">Ganho de Capital</div>
+                        <div style="color: {color_ganho}; font-weight: bold; font-size: 12px; margin-top: 2px;">{formatar_br(ganho_capital_kpi)}</div>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-size: 10px; text-transform: uppercase; color: #7F8C8D;">Dividendos Recebidos</div>
-                        <div style="color: #2E8B57; font-weight: bold; font-size: 12px;">{formatar_br(total_dividendos)}</div>
+                        <div style="font-size: 9px; text-transform: uppercase; color: #7F8C8D; line-height: 1.1;">Dividendos Recebidos</div>
+                        <div style="color: #2E8B57; font-weight: bold; font-size: 12px; margin-top: 2px;">{formatar_br(total_dividendos)}</div>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
     with col3:
-        st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">R$ 0,00</div></div>""", unsafe_allow_html=True)
+        # 🎯 CARD 3: ÚLTIMO PROVENTO MENSAL
+        st.markdown(f"""
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
+                <div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_br(ult_provento_val)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                    Mês de Referência: <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
     with col4:
-        st.markdown(f"""<div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; min-height: 140px;"><span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Variação e Rentabilidade</span><div style="color: #2E8B57; font-size: 24px; font-weight: 700; margin-top: 5px;">0.00%</div></div>""", unsafe_allow_html=True)
+        # 🎯 CARD 4: VARIAÇÃO E RENTABILIDADE (Retorno Estratégico Total da Carteira)
+        st.markdown(f"""
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 15px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 140px;">
+                <span style="color: #5D6D7E; font-size: 12px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
+                <div style="color: {color_rent}; font-size: 24px; font-weight: 700; margin-top: 5px; margin-bottom: 5px;">{formatar_pct(rentabilidade_total_pct)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 5px; font-size: 12px; color: #7F8C8D;">
+                    Resultado Comercial: <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<hr style='margin: 5px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
-    # 🏁 BLOCOS GRÁFICOS LADO A LADO
+    # ==============================================================================
+    # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
+    # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
     with col_bloco_esquerdo:
