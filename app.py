@@ -123,7 +123,6 @@ try:
             carteira[ticker]['custo_total'] = 0.0
             carteira[ticker]['preco_medio'] = 0.0
             
-        # Grava a foto da carteira após este trade para cada ativo existente
         for tk, dados in carteira.items():
             historico_detalhado.append({
                 'Data': data,
@@ -156,10 +155,7 @@ try:
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
         
-        # Se algum ativo antigo não tiver preço no Yahoo em meses remotos, assume o custo amortizado como margem de segurança
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
-        
-        # Calculation of point-in-time equity value
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
         # Consolidação Final Agrupada por Mês
@@ -170,7 +166,6 @@ try:
         
         df_portfolio_mensal['Mês_Exibição'] = df_portfolio_mensal['Mes_Ano'].dt.strftime('%m/%Y')
         
-        # Extração das variáveis finais de fechamento para alimentar os Cards
         total_investido_kpi = float(df_portfolio_mensal.iloc[-1]['Custo_Total'])
         patrimonio_mercado_kpi = float(df_portfolio_mensal.iloc[-1]['Patrimonio_Mercado_Ativo'])
 
@@ -184,7 +179,6 @@ st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
 with aba_resumo:
-    # Formatação Padrão BR
     def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     str_investido = formatar_br(total_investido_kpi)
     str_patrimonio = formatar_br(patrimonio_mercado_kpi)
@@ -238,29 +232,25 @@ with aba_resumo:
         
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 📈 IMPRESSÃO DO GRÁFICO DUPLO DE EVOLUÇÃO PATRIMONIAL (MERCADO VS INVESTIDO)
+    # 📊 RENDERIZAÇÃO DO GRÁFICO EM BARRAS AGRUPADAS (MERCADO VS INVESTIDO)
     if not df_portfolio_mensal.empty:
         fig_evolucao = go.Figure()
         
-        # Linha 1: Valor de Mercado (Verde)
-        fig_evolucao.add_trace(go.Scatter(
+        # Barra 1: Valor de Mercado (Verde)
+        fig_evolucao.add_trace(go.Bar(
             x=df_portfolio_mensal['Mês_Exibição'], 
             y=df_portfolio_mensal['Patrimonio_Mercado_Ativo'],
-            mode='lines+markers',
             name='Valor de Mercado Real B3',
-            line=dict(color='#2E8B57', width=3),
-            marker=dict(size=5),
+            marker_color='#2E8B57',
             hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
         ))
         
-        # Linha 2: Total Investido (Azul Tracejado)
-        fig_evolucao.add_trace(go.Scatter(
+        # Barra 2: Total Investido (Azul)
+        fig_evolucao.add_trace(go.Bar(
             x=df_portfolio_mensal['Mês_Exibição'], 
             y=df_portfolio_mensal['Custo_Total'],
-            mode='lines+markers',
             name='Total Investido (Bolso)',
-            line=dict(color='#118DFF', width=2, dash='dot'),
-            marker=dict(size=5),
+            marker_color='#118DFF',
             hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
         ))
         
@@ -269,6 +259,9 @@ with aba_resumo:
             title_font=dict(size=15, color='#2C3E50'),
             margin=dict(l=50, r=30, t=50, b=40),
             height=400,
+            barmode='group',  # Garante que as barras fiquem lado a lado por mês
+            bargap=0.15,       # Espaçamento entre os blocos de meses
+            bargroupgap=0.05,  # Espaçamento interno entre a barra verde e azul
             hovermode='x unified',
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
