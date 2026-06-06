@@ -14,13 +14,13 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA FULL-WIDTH, COMPRESSÃO E SIMETRIA DOS CARDS
+# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL E AJUSTES DE ESPAÇAMENTO DO TOPO
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
         
-        /* 2. Zera o recuo superior e força o preenchimento total da largura da tela (Full Width) */
+        /* 2. Zera o recuo superior e força o preenchimento total da largura da tela */
         [data-testid="stMainBlockContainer"] {
             padding-top: 1rem !important;
             padding-bottom: 1rem !important;
@@ -29,26 +29,13 @@ st.markdown("""
             max-width: 100% !important;
         }
         
-        /* 3. Comprime o espaço vertical entre blocos e linhas do Streamlit */
-        [data-testid="stVerticalBlock"] {
-            gap: 0.4rem !important;
-        }
-        
-        /* 4. Ajusta a margem do título principal */
-        h1 { 
-            margin-top: -5px !important; 
-            margin-bottom: 5px !important; 
-            font-size: 26px !important; 
-            font-weight: 700 !important;
-        }
-        
-        /* 5. Oculta os menus e botões da plataforma */
+        /* 3. Oculta os menus e botões da plataforma */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
         
-        /* 6. Esconde o ícone do GitHub no canto superior direito */
+        /* 4. Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
     </style>
@@ -251,17 +238,25 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
+    # CONTAINER DOS CARTÕES: margin-bottom negativa puxa apenas a linha dos cartões ligeiramente para cima
+    st.markdown('<div style="margin-bottom: -10px;">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # 🎯 CARD 1 - Corrigida a assimetria removendo o align-items centralizado do rodapé
+        # 🎯 CARD 1 - Totalmente equalizado em HTML/CSS com os outros três (Simetria perfeita de tamanho)
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
                 <div style="color: #2C3E50; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(patrimonio_mercado_kpi)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                    <span>Total Investido: <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong></span>
-                    <span>Var: <strong style="color: {color_var}; font-size: 11.5px;">{formatar_pct(variacao_carteira_pct)}</strong></span>
+                    <div>
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Investido:</span>
+                        <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Var:</span>
+                        <strong style="color: {color_var}; font-size: 11.5px;">{formatar_pct(variacao_carteira_pct)}</strong>
+                    </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -290,7 +285,10 @@ with aba_resumo:
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
                 <div style="color: #2E8B57; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(ult_provento_val)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                    <span>Mês de Referência:</span> <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
+                    <div>
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Ref:</span>
+                        <strong style="color: #34495E;">{ult_provento_mes}</strong>
+                    </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -301,13 +299,20 @@ with aba_resumo:
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
                 <div style="color: {color_rent}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_pct(rentabilidade_total_pct)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                    <span>Resultado Comercial:</span> <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
+                    <div>
+                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Comercial:</span>
+                        <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong>
+                    </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True) # Fecha container dos cartões
 
-    # 🎯 Ajustado o espaçamento inferior (margin-bottom: 12px) para empurrar os gráficos levemente para baixo
-    st.markdown("<hr style='margin: 4px 0 12px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+    # Linha divisória fina tradicional
+    st.markdown("<hr style='margin: 2px 0 2px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+
+    # 🎯 ESPAÇADOR CONTROLADO DA LINHA DOS GRÁFICOS: Garante que os gráficos fiquem parados enquanto os cartões sobem
+    st.markdown('<div style="margin-top: 16px;"></div>', unsafe_allow_html=True)
 
     # ==============================================================================
     # BLOCOS GRÁFICOS PARALELOS (60% / 40%)
