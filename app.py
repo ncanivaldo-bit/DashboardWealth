@@ -14,16 +14,24 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA ESCONDER O ÍCONE DO GITHUB E MENUS DE CONFIGURAÇÃO DO STREAMLIT
+# 🎯 INJEÇÃO CSS PARA ESCONDER O ÍCONE DO GITHUB, MENUS E ELIMINAR O ESPAÇO DO TOPO
 st.markdown("""
     <style>
-        /* Esconde o ícone do GitHub no canto superior direito */
-        .viewerBadge_link__1S137 { display: none !important; }
-        a.viewerBadge_link__1S137 { display: none !important; }
+        /* Esconde o cabeçalho e menus nativos */
+        [data-testid="stHeader"] { display: none !important; }
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
+        
+        /* Esconde o ícone do GitHub no canto superior direito */
+        .viewerBadge_link__1S137 { display: none !important; }
+        a.viewerBadge_link__1S137 { display: none !important; }
+        
+        /* Elimina o espaço em branco gigante superior puxando o painel para o topo */
+        .main .block-container {
+            padding-top: 1rem !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -329,8 +337,8 @@ with aba_resumo:
                 ))
                 
                 fig_barras.update_layout(
-                    margin=dict(l=35, r=5, t=10, b=10),
-                    height=280,
+                    margin=dict(l=40, r=10, t=10, b=10),
+                    height=310,
                     barmode='relative',
                     bargap=0.2,
                     hovermode='x unified',
@@ -351,7 +359,7 @@ with aba_resumo:
                 tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             df_rosca_filtrada = df_custodia_atual.copy()
             if filtro_tipo != "Todos os tipos" and not df_rosca_filtrada.empty:
