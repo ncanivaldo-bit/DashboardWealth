@@ -10,45 +10,60 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # ==============================================================================
-# CONFIGURAÇÃO DE TELA E AJUSTE ANTIRROLAGEM (100% VIEWPORT)
+# CONFIGURAÇÃO DE TELA E ENGENHARIA DE RESPONSIVIDADE (ZERO SCROLL)
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# Injeção de CSS para travar o layout na altura exata da tela e eliminar gaps
+# CSS Avançado focado estritamente em eliminar o topo gigante e dar responsividade vertical
 st.markdown("""
     <style>
-        /* Remove o scrollbar da página principal e trava a altura máxima */
-        html, body, [data-testid="stAppViewContainer"] {
-            height: 100vh;
+        /* 1. Remove o espaço em branco gigante do topo nativo do Streamlit */
+        [data-testid="stHeader"] { display: none !important; }
+        [data-testid="stAppViewContainer"] { background-color: #F8F9FA; }
+        
+        /* 2. Zera as margens e paddings da página para aproveitar 100% da tela */
+        .main .block-container {
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+            max-height: 100vh;
             overflow: hidden;
         }
-        /* Compacta o bloco de conteúdo principal */
-        [data-testid="stMain"] {
-            padding-top: 1rem !important;
-            padding-bottom: 1rem !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
+        
+        /* 3. Ajusta o tamanho dos títulos para economizar espaço vertical */
+        h1 { 
+            margin-top: -10px !important; 
+            margin-bottom: 0px !important; 
+            padding-bottom: 0px !important; 
+            font-size: 24px !important; 
+            font-weight: 700 !important;
         }
-        /* Esconde o ícone do GitHub no canto superior direito */
+        
+        /* 4. Esconde os menus e botões da plataforma */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
-        header { visibility: hidden; }
         .stDeployButton { display: none !important; }
         
-        /* Reduz margens de cabeçalhos e componentes de filtros */
-        h1 { margin-top: -15px !important; margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 28px !important; }
-        .stTabs [data-baseweb="tab-list"] { gap: 10px !important; }
-        .stTabs [data-baseweb="tab"] { padding-top: 4px !important; padding-bottom: 4px !important; }
+        /* 5. Comprime as abas (Tabs) */
+        .stTabs [data-baseweb="tab-list"] { gap: 8px !important; }
+        .stTabs [data-baseweb="tab"] { padding-top: 2px !important; padding-bottom: 2px !important; font-size: 14px !important; }
+        
+        /* 6. Força os containers dos gráficos a respeitarem a altura disponível */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            margin-bottom: 0px !important;
+            padding-bottom: 0px !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("PREVPRIV")
-st.markdown("<p style='margin-top: -5px; margin-bottom: 5px; font-size: 15px;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
+st.markdown("<p style='margin-top: -6px; margin-bottom: 4px; font-size: 13px; color: #5D6D7E;'>🎯 <b>Missão:</b> Do vácuo absoluto a renda passiva sustentável</p>", unsafe_allow_html=True)
 
 # ==============================================================================
-# CONEXÃO DIRETA COM O GOOGLE DRIVE (Com proteção de Retry)
+# CONEXÃO DIRETA COM O GOOGLE DRIVE
 # ==============================================================================
 @st.cache_resource
 def get_drive_service():
@@ -79,7 +94,7 @@ def download_excel_from_drive(file_id, sheet_name=0):
             time.sleep(1)
 
 # ==============================================================================
-# MOTOR MATRICIAL - PROCESSAMENTO DOS DADOS CACHEADO
+# MOTOR MATRICIAL CACHEADO
 # ==============================================================================
 @st.cache_data(ttl=600)
 def carregar_e_processar_dados_carteira():
@@ -201,10 +216,9 @@ def carregar_e_processar_dados_carteira():
         return df_consolidado, df_custodia_atual, total_dividendos_historico, ultimo_provento_valor, ultimo_provento_mes_ano
     return pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
 
-# Execução do Motor de Inteligência
+# Inicialização das variáveis matemáticas
 df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = carregar_e_processar_dados_carteira()
 
-# Inicialização padrão de variáveis matemáticas
 total_investido_kpi = 0.0
 patrimonio_mercado_kpi = 0.0
 ganho_capital_kpi = 0.0
@@ -215,7 +229,6 @@ rentabilidade_total_pct = 0.0
 if not df_custodia_atual.empty:
     total_investido_kpi = float(df_custodia_atual['Custo_Total'].sum())
     patrimonio_mercado_kpi = float(df_custodia_atual['Patrimonio_Mercado_Ativo'].sum())
-    
     ganho_capital_kpi = patrimonio_mercado_kpi - total_investido_kpi
     lucro_total_kpi = ganho_capital_kpi + total_dividendos
     
@@ -224,7 +237,7 @@ if not df_custodia_atual.empty:
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
 # ==============================================================================
-# RENDERIZAÇÃO DA INTERFACE VISUAL COMPACTA
+# RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
@@ -242,14 +255,15 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
+    # Reduzi o padding interno e o tamanho dos textos dos cartões para economizar altura
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 6px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 2px rgba(0,0,0,0.01); min-height: 100px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                <div style="color: #2C3E50; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(patrimonio_mercado_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
+                <div style="color: #2C3E50; font-size: 20px; font-weight: 700; margin-top: 1px; margin-bottom: 1px;">{formatar_br(patrimonio_mercado_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 2px; font-size: 10.5px; color: #7F8C8D; display: flex; justify-content: space-between; align-items: center;">
                     <span>Investido: <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong></span>
                     <span>Var: <strong style="color: {color_var};">{formatar_pct(variacao_carteira_pct)}</strong></span>
                 </div>
@@ -258,10 +272,10 @@ with aba_resumo:
         
     with col2:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 6px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 2px rgba(0,0,0,0.01); min-height: 100px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
-                <div style="color: {color_lucro}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(lucro_total_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 10px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                <div style="color: {color_lucro}; font-size: 20px; font-weight: 700; margin-top: 1px; margin-bottom: 1px;">{formatar_br(lucro_total_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 2px; font-size: 10px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <span>G. Cap: <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong></span>
                     <span>Prov: <strong style="color: #2E8B57;">{formatar_br(total_dividendos)}</strong></span>
                 </div>
@@ -270,10 +284,10 @@ with aba_resumo:
         
     with col3:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 6px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 2px rgba(0,0,0,0.01); min-height: 100px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
-                <div style="color: #2E8B57; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(ult_provento_val)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 11px; color: #7F8C8D;">
+                <div style="color: #2E8B57; font-size: 20px; font-weight: 700; margin-top: 1px; margin-bottom: 1px;">{formatar_br(ult_provento_val)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 2px; font-size: 10.5px; color: #7F8C8D;">
                     Mês Ref: <span style="color: #34495E; font-weight: bold;">{ult_provento_mes}</span>
                 </div>
             </div>
@@ -281,19 +295,19 @@ with aba_resumo:
         
     with col4:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 12px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.02); min-height: 115px;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 6px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 2px rgba(0,0,0,0.01); min-height: 100px;">
                 <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
-                <div style="color: {color_rent}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_pct(rentabilidade_total_pct)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 3px; font-size: 11px; color: #7F8C8D;">
+                <div style="color: {color_rent}; font-size: 20px; font-weight: 700; margin-top: 1px; margin-bottom: 1px;">{formatar_pct(rentabilidade_total_pct)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 2px; font-size: 10.5px; color: #7F8C8D;">
                     Resultado Com: <span style="color: {color_ganho}; font-weight: bold;">{formatar_br(ganho_capital_kpi)}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin: 4px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 3px 0; border-color: #ECEFF1;'>", unsafe_allow_html=True)
 
     # ==============================================================================
-    # GRID GRÁFICOS PARALELOS (60% / 40%) - ENGENHARIA DE TELA ÚNICA
+    # BLOCKS GRÁFICOS PARALELOS RESPONSIVOS (60% / 40%) - ENQUADRAMENTO DINÂMICO
     # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
@@ -301,13 +315,11 @@ with aba_resumo:
         with st.container(border=True):
             col_t1, col_f1 = st.columns([7, 3])
             with col_t1:
-                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:17px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:16px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
             with col_f1:
                 anos_disponiveis = ["Desde o início"] + sorted(list(df_consolidado['Ano_Str'].unique()), reverse=True) if not df_consolidado.empty else ["Desde o início"]
                 filtro_ano = st.selectbox("Período", options=anos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
-
             df_filtrado_grafico = df_consolidado.copy()
             if filtro_ano != "Desde o início" and not df_filtrado_grafico.empty:
                 df_filtrado_grafico = df_filtrado_grafico[df_filtrado_grafico['Ano_Str'] == filtro_ano]
@@ -338,17 +350,18 @@ with aba_resumo:
                     hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
+                # 🎯 Redução drástica do tamanho e margem interna do gráfico para caber na Viewport do Chrome
                 fig_barras.update_layout(
-                    margin=dict(l=35, r=5, t=10, b=10),
-                    height=230, # Reduzido cirurgicamente para travar o layout em tela cheia
+                    margin=dict(l=35, r=5, t=5, b=5),
+                    height=205, 
                     barmode='relative',
                     bargap=0.2,
                     hovermode='x unified',
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "),
-                    xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
+                    yaxis=dict(gridcolor='rgba(230,235,240,0.4)', tickprefix="R$ ", font=dict(size=9)),
+                    xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category', font=dict(size=9)),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=9))
                 )
                 st.plotly_chart(fig_barras, use_container_width=True)
 
@@ -356,13 +369,11 @@ with aba_resumo:
         with st.container(border=True):
             col_t2, col_f2 = st.columns([6, 4])
             with col_t2:
-                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:17px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:16px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
             with col_f2:
                 tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
                 
-            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
-
             df_rosca_filtrada = df_custodia_atual.copy()
             if filtro_tipo != "Todos os tipos" and not df_rosca_filtrada.empty:
                 df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
@@ -386,9 +397,10 @@ with aba_resumo:
                     hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
                 
+                # 🎯 Redução da rosca simétrica para fechar o grid na mesma linha sem estourar
                 fig_pie.update_layout(
-                    margin=dict(l=0, r=0, t=10, b=10),
-                    height=230, # Reduzido simetricamente com a mesma altura das barras
+                    margin=dict(l=0, r=0, t=5, b=5),
+                    height=205, 
                     paper_bgcolor='rgba(0,0,0,0)',
                     showlegend=True,
                     legend=dict(
@@ -397,12 +409,12 @@ with aba_resumo:
                         y=0.5, 
                         xanchor="left", 
                         x=0.68,
-                        font=dict(size=10)
+                        font=dict(size=9.5)
                     )
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
             else:
-                st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
+                st.info("ℹ️ Sem ativos.")
 
 with aba_alocacao:
     st.info("⚙️ Aba de alocação estruturada.")
