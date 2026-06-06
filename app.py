@@ -36,36 +36,39 @@ def download_excel_from_drive(file_id, sheet_name=0):
     return pd.read_excel(fh, engine='openpyxl', sheet_name=sheet_name)
 
 # ==============================================================================
-# FUNÇÃO CORRIGIDA PARA BAIXAR COTAÇÕES HISTÓRICAS REAIS (ATIVO POR ATIVO)
+# MOTOR PROFISSONAL DE BUSCA DE COTAÇÕES HISTÓRICAS REAIS
 # ==============================================================================
-@st.cache_data(ttl=86400)  # Guarda em cache por 24h
+@st.cache_data(ttl=86400)
 def buscar_fechamentos_historicos(tickers_list, data_minima):
-    df_consolidado_precos = pd.DataFrame()
+    df_quadro_precos = pd.DataFrame()
     
     for tk in tickers_list:
-        if not tk or str(tk) == 'nan' or tk == 'SPYI11':  # Ignora nulos ou ativos sem histórico padrão
+        if not tk or str(tk) == 'nan' or tk == 'SPYI11':
             continue
         try:
-            # Baixa o histórico individual para evitar problemas de MultiIndex no cabeçalho
-            df_ticker = yf.download(f"{tk}.SA", start=data_minima, interval="1mo", progress=False)
+            # Uso do objeto Ticker + history (muito mais estável para ativos da B3)
+            ticker_objeto = yf.Ticker(f"{tk}.SA")
+            df_hist = ticker_objeto.history(start=data_minima, interval="1mo")
             
-            if not df_ticker.empty:
-                # Seleciona a primeira coluna de preço disponível de forma posicional (.iloc),
-                # eliminando a dependência do nome exato 'Adj Close' ou 'Close'
-                precos_serie = df_ticker.iloc[:, 0].copy()
+            if not df_hist.empty:
+                # Captura a coluna de fechamento independente do case ('Close' ou 'close')
+                col_fechamento = [c for c in df_hist.columns if c.lower() == 'close'][0]
+                serie_preco = df_hist[col_fechamento].copy()
                 
-                # Converte o índice de tempo para Ano-Mês
-                precos_serie.index = precos_serie.index.to_period('M')
+                # Alinha o índice temporal para o formato Ano-Mês
+                serie_preco.index = serie_preco.index.to_period('M')
+                serie_preco = serie_preco.groupby(serie_preco.index).last()
                 
-                # Agrupa pelo índice para garantir que temos apenas um preço por mês (evitando duplicatas)
-                precos_serie = precos_serie.groupby(precos_serie.index).last()
-                
-                # Injeta a série histórica no DataFrame principal usando o Ticker como nome da coluna
-                df_consolidado_precos[tk] = precos_serie
+                df_quadro_precos[tk] = serie_preco
         except Exception:
-            pass # Avança de forma silenciosa caso algum ticker específico falhe na API
+            pass
             
-    return df_consolidado_precos
+    # Tratamento de preenchimento progressivo: se o mercado não abriu ou a API falhou 
+    # num mês específico, ele herda o preço de mercado real do mês anterior (ffill)
+    if not df_quadro_precos.empty:
+        df_quadro_precos = df_quadro_precos.ffill()
+        
+    return df_quadro_precos
 
 # ==============================================================================
 # PROCESSAMENTO DOS DADOS DO DRIVE E CÁLCULO PATRIMONIAL
@@ -86,31 +89,27 @@ try:
     df_mov['Data'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
     df_mov['Ticker'] = df_mov['Produto'].astype(str).str.split(' - ').str[0].str.strip()
     
-    # Unifica as mudanças históricas de Ticker
     df_mov['Ticker'] = df_mov['Ticker'].replace('MALL11', 'PMLL11')
     df_mov['Ticker'] = df_mov['Ticker'].replace('CVBI11', 'PCIP11')
     
-    # Força conversão numérica segura
     df_mov['Quantidade'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor da Operação'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     
-    # 3. Processamento de Custódia e Preço Médio Atual
+    # 3. Processamento Cronológico de Custódia
     df_trades = df_mov[df_mov['Movimentação'].isin(['Transferência - Liquidação', 'Desdobro', 'Atualização'])].sort_values('Data').copy()
     df_trades['AnoMes'] = df_trades['Data'].dt.to_period('M')
     
-    # Identifica parâmetros para a chamada da API
     data_inicio_string = df_trades['Data'].min().strftime('%Y-%m-%d') if not df_trades.empty else "2023-01-01"
     lista_todos_tickers = df_trades['Ticker'].dropna().unique().tolist()
     
-    # CHAMA A NOVA FUNÇÃO BLINDADA ATIVO POR ATIVO
-    df_precos_historicos_b3 = buscar_fechamentos_historicos(lista_todos_tickers, data_inicio_string)
+    # Baixa a tabela com os preços REAIS de fechamento da história
+    df_precos_reais_api = buscar_fechamentos_historicos(lista_todos_tickers, data_inicio_string)
     
     carteira_corrente = {}
     meses_historicos = sorted(df_trades['AnoMes'].dropna().unique())
     historico_pontos = []
     
-    # Varre a história mês a mês atualizando a custódia (Método Colab)
     for am in meses_historicos:
         df_mes = df_trades[df_trades['AnoMes'] == am]
         
@@ -129,16 +128,16 @@ try:
             elif mov == 'Atualização' and tk == 'PCIP11' and qtd == 159:
                 continue
             elif mov == 'Transferência - Liquidação':
-                if sentido == 'Credito': # Compra
+                if sentido == 'Credito':
                     carteira_corrente[tk]['qtd'] += qtd
                     carteira_corrente[tk]['custo'] += valor_op
-                elif sentido == 'Debito': # Venda
+                elif sentido == 'Debito':
                     if carteira_corrente[tk]['qtd'] > 0:
                         pm_proporcional = carteira_corrente[tk]['custo'] / carteira_corrente[tk]['qtd']
                         carteira_corrente[tk]['qtd'] = max(0.0, carteira_corrente[tk]['qtd'] - qtd)
                         carteira_corrente[tk]['custo'] = carteira_corrente[tk]['qtd'] * pm_proporcional
                         
-        # VALORAÇÃO DE MERCADO HISTÓRICA REAL DO MÊS COM PREÇOS DA API
+        # CÁLCULO PATRIMONIAL DO MÊS CORRIGIDO
         investido_no_mes = 0.0
         mercado_no_mes = 0.0
         
@@ -146,17 +145,18 @@ try:
             if dados['qtd'] > 0:
                 investido_no_mes += dados['custo']
                 
-                preco_real_mes = 0.0
-                # Extrai o preço do índice do DataFrame consolidado de preços reais
-                if not df_precos_historicos_b3.empty and am in df_precos_historicos_b3.index:
-                    if tk in df_precos_historicos_b3.columns:
-                        preco_real_mes = float(df_precos_historicos_b3.loc[am, tk])
+                # Tenta resgatar o preço real da bolsa daquele mês
+                preco_real_fechamento = 0.0
+                if not df_precos_reais_api.empty and am in df_precos_reais_api.index:
+                    if tk in df_precos_reais_api.columns:
+                        preco_real_fechamento = float(df_precos_reais_api.loc[am, tk])
                 
-                # Fallback de segurança: se o ativo não tiver histórico na data (ou for o SPYI11), usa o preço médio
-                if pd.isna(preco_real_mes) or preco_real_mes <= 0:
-                    preco_real_mes = dados['custo'] / dados['qtd']
+                # Se não houver histórico na API para aquele mês específico de jeito nenhum,
+                # aí sim aplicamos o Preço Médio como último recurso
+                if pd.isna(preco_real_fechamento) or preco_real_fechamento <= 0:
+                    preco_real_fechamento = dados['custo'] / dados['qtd']
                     
-                mercado_no_mes += dados['qtd'] * preco_real_mes
+                mercado_no_mes += dados['qtd'] * preco_real_fechamento
                 
         if investido_no_mes > 0:
             historico_pontos.append({
@@ -167,7 +167,7 @@ try:
             
     df_evolucao = pd.DataFrame(historico_pontos)
 
-    # 4. Consolidação Atual para os KPIs e Gráfico de Rosca
+    # 4. Consolidação Atual para KPIs e Rosca
     linhas_finais = []
     for tk, dados in carteira_corrente.items():
         if dados['qtd'] > 0:
@@ -198,7 +198,7 @@ try:
 
     rentabilidade_pct = (ganho_capital / total_investido * 100) if total_investido > 0 else 0.0
 
-    # --- ESTILIZAÇÃO DOS VALORES DE TELA ---
+    # --- ESTILIZAÇÃO DE STRINGS MENSAGENS ---
     def formatar_br(v): return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     str_patrimonio = formatar_br(patrimonio_total)
     str_investido = formatar_br(total_investido)
@@ -269,35 +269,35 @@ try:
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ==============================================================================
-        # GRÁFICOS RECONSTRUÍDOS COM MAESTRIA E PREÇOS REAIS DA API (60% / 40%)
+        # GRÁFICOS RECONSTRUÍDOS (60% / 40%)
         # ==============================================================================
         g_col1, g_col2 = st.columns([6, 4])
         
         with g_col1:
             if not df_evolucao.empty:
                 fig_lin = go.Figure()
-                # Linha do Valor de Mercado Real vinda da API de cotações históricas individuais
+                # Linha do Valor de Mercado Real (Verde)
                 fig_lin.add_trace(go.Scatter(
                     x=df_evolucao['Mês'], 
                     y=df_evolucao['Valor de Mercado'],
                     mode='lines+markers',
-                    name='Valor de Mercado (API)',
+                    name='Valor de Mercado (Preço Real)',
                     line=dict(color='#2E8B57', width=3),
                     marker=dict(size=5),
                     hovertemplate='<b>Mês:</b> %{x}<br><b>Mercado:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
-                # Linha do Total Investido Real (Custo Acumulado)
+                # Linha do Total Investido (Azul Tracejado)
                 fig_lin.add_trace(go.Scatter(
                     x=df_evolucao['Mês'], 
                     y=df_evolucao['Total Investido'],
                     mode='lines+markers',
-                    name='Total Investido',
+                    name='Total Investido (Custo)',
                     line=dict(color='#118DFF', width=2, dash='dot'),
                     marker=dict(size=5),
                     hovertemplate='<b>Mês:</b> %{x}<br><b>Investido:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 fig_lin.update_layout(
-                    title="<b>Evolução Patrimonial: Investido vs Mercado Real</b>",
+                    title="<b>Evolução Patrimonial Real: Custo vs Mercado B3</b>",
                     title_font=dict(size=14, color='#2C3E50'),
                     margin=dict(l=40, r=20, t=40, b=30),
                     height=400,
@@ -314,7 +314,6 @@ try:
         with g_col2:
             df_rosca = df_final.sort_values(by='Patrimônio Atual', ascending=False).copy()
             
-            # Legenda Perfeita: Estritamente Ticker e a porcentagem limpa ao lado direito
             lista_legendas = []
             for _, r_f in df_rosca.iterrows():
                 pct_mi = (r_f['Patrimônio Atual'] / patrimonio_total) * 100 if patrimonio_total > 0 else 0.0
