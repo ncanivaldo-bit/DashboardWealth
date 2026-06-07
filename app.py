@@ -238,7 +238,7 @@ if not df_custodia_atual.empty:
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# ABA 1: RESUMO (TOTALMENTE PRESERVADA)
+# ABA 1: RESUMO (PRESERVADA)
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -341,14 +341,14 @@ with aba_resumo:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             df_rosca = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
-            labels_r = [f"<b>{row['Ticker']}</b> ({(row['Patrimonio_Mercado_Ativo']/patrimonio_mercado_kpi)*100:.1f}%)" for _, row in df_rosca.iterrows()]
+            labels_r = [f"<b>{row['Ticker']}</b> ({(row['Patrimonio_Mercado_Ativo']/patrimonio_market_kpi)*100:.1f}%)" if 'patrimonio_market_kpi' in locals() else f"<b>{row['Ticker']}</b>" for _, row in df_rosca.iterrows()]
             fig_p = go.Figure(go.Pie(labels=labels_r, values=df_rosca['Patrimonio_Mercado_Ativo'], hole=0.55, textinfo='none'))
             fig_p.update_layout(margin=dict(l=0, r=0, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)', showlegend=True, legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.68, font=dict(size=10)))
             st.plotly_chart(fig_p, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (PROPORÇÃO DE 40% / 60% COM AJUSTE DE LEGENDA)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (PROPORÇÃO DE 40% / 60% COM SIMETRIA TOTAL DAS ROSCAS)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
@@ -356,7 +356,6 @@ with aba_alocacao:
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
         
-        # Mapeamento seguro das colunas do Drive
         if 'Classificacao' not in df_analise.columns: df_analise['Classificacao'] = 'NÃO INFORMADO'
         if 'Seguimento' not in df_analise.columns: df_analise['Seguimento'] = 'NÃO INFORMADO'
         if 'Gestora' not in df_analise.columns: df_analise['Gestora'] = 'NÃO INFORMADO'
@@ -369,7 +368,7 @@ with aba_alocacao:
         col_super_esq, col_super_dir = st.columns([4, 6])
         
         # ==============================================================================
-        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS
+        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (height=540px)
         # ==============================================================================
         with col_super_esq:
             with st.container(border=True):
@@ -390,7 +389,7 @@ with aba_alocacao:
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
         # ==============================================================================
-        # COLUNA DA DIREITA (60%): CLASSIFICAÇÃO E SEGUIMENTO ALINHADOS
+        # COLUNA DA DIREITA (60%): CLASSIFICAÇÃO E SEGUIMENTO EM EQUILÍBRIO DE TAMANHO
         # ==============================================================================
         with col_super_dir:
             
@@ -416,18 +415,16 @@ with aba_alocacao:
                 with st.container(border=True):
                     st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>3. Seguimento</h4>", unsafe_allow_html=True)
                     df_g_seg = df_analise.groupby('Seguimento')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
-                    total_seg = df_g_seg['Patrimonio_Mercado_Ativo'].sum()
-                    labels_seg = [f"<b>{r['Seguimento']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_seg)*100:.1f}%)" for _, r in df_g_seg.iterrows()]
                     
-                    # 🎯 AJUSTADO: domain joga a rosca para a esquerda e x=1.05 afasta a legenda completamente para fora
+                    # 🎯 AJUSTADO: Legenda externa removida e rótulos trazidos para dentro (textinfo='label+percent'). 
+                    # Agora a rosca ocupa 100% da área útil e fica exatamente do mesmo tamanho do gráfico ao lado!
                     fig_s = go.Figure(go.Pie(
-                        labels=labels_seg, values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
-                        domain=dict(x=[0.0, 0.65]), textinfo='none',
-                        hovertemplate='<b>Setor:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
+                        labels=df_g_seg['Seguimento'], values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
+                        textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
+                        hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
                     fig_s.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
-                        legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1.05, font=dict(size=8.5))
+                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
