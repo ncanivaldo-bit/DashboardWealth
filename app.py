@@ -317,7 +317,7 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # Margem inversa unificada puxa os gráficos para cima de forma estrita
+    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
     st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
 
     # ==============================================================================
@@ -347,31 +347,37 @@ with aba_resumo:
                 }).reset_index().sort_values('Mes_Ano')
                 
                 df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
-                df_totais_mensais['Valor_Aplicado'] = df_totais_mensais['Custo_Total']
-                df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] - df_totais_mensais['Custo_Total']
-
-                fig_barras = go.Figure()
-                fig_barras.add_trace(go.Bar(
+                
+                # 🎯 CONSTRUÇÃO DO GRÁFICO DE LINHAS (ÁREA AVANÇADA)
+                fig_linhas = go.Figure()
+                
+                # 1. Área do Patrimônio Total de Mercado (Com preenchimento sutil por baixo)
+                fig_linhas.add_trace(go.Scatter(
                     x=df_totais_mensais['Mês_Exibição'], 
-                    y=df_totais_mensais['Valor_Aplicado'],
-                    name='Valor aplicado',
-                    marker_color='#1fbc74', 
-                    hovertemplate='<b>Aplicado:</b> R$ %{y:,.2f}<extra></extra>'
-                ))
-                fig_barras.add_trace(go.Bar(
-                    x=df_totais_mensais['Mês_Exibição'], 
-                    y=df_totais_mensais['Ganho_de_Capital'],
-                    name='Ganho de Capital',
-                    marker_color='#7ee0b3',
-                    hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
+                    y=df_totais_mensais['Patrimonio_Mercado_Ativo'],
+                    mode='lines+markers',
+                    name='Patrimônio Atual',
+                    line=dict(color='#1fbc74', width=3),
+                    marker=dict(size=6),
+                    fill='tozeroy',
+                    fillcolor='rgba(31, 188, 116, 0.06)', # Sombra verde elegante
+                    hovertemplate='<b>Patrimônio Atual:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
-                # 🎯 TRAVAMENTO ABSOLUTO: Eixo Y fixado estritamente de -50k a 300k. Fundo aberto e topo estendido sem falha.
-                fig_barras.update_layout(
+                # 2. Linha do Custo Total Investido (Dinheiro do bolso)
+                fig_linhas.add_trace(go.Scatter(
+                    x=df_totais_mensais['Mês_Exibição'], 
+                    y=df_totais_mensais['Custo_Total'],
+                    mode='lines',
+                    name='Total Investido',
+                    line=dict(color='#118DFF', width=2, dash='dot'), # Linha pontilhada azul para referência
+                    hovertemplate='<b>Total Investido:</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                
+                # Layout simétrico em 260px com escala responsiva natural do Plotly
+                fig_linhas.update_layout(
                     margin=dict(l=45, r=10, t=25, b=10),
                     height=260, 
-                    barmode='relative',
-                    bargap=0.2,
                     hovermode='x unified',
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
@@ -379,13 +385,12 @@ with aba_resumo:
                         gridcolor='rgba(230,235,240,0.6)', 
                         tickprefix="R$ ", 
                         tickformat="~s",  
-                        nticks=6,
-                        range=[-50000, 300000]
+                        nticks=6
                     ),
                     xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
                     legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
                 )
-                st.plotly_chart(fig_barras, use_container_width=True)
+                st.plotly_chart(fig_linhas, use_container_width=True)
 
     with col_bloco_direito:
         with st.container(border=True):
