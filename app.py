@@ -351,8 +351,13 @@ with aba_resumo:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             df_rosca = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
+            # Ajuste na legenda para evitar sobreposição, movendo-a para fora do gráfico
             fig_p = go.Figure(go.Pie(labels=df_rosca['Ticker'], values=df_rosca['Patrimonio_Mercado_Ativo'], hole=0.55, textinfo='none'))
-            fig_p.update_layout(margin=dict(l=0, r=0, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)', showlegend=True, legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.68, font=dict(size=10)))
+            fig_p.update_layout(
+                margin=dict(l=0, r=0, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)',
+                showlegend=True,
+                legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1.05, font=dict(size=10))
+            )
             st.plotly_chart(fig_p, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -466,3 +471,4 @@ with aba_alocacao:
         """, unsafe_allow_html=True)
     else:
         st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
+
