@@ -391,7 +391,7 @@ with aba_alocacao:
         df_analise['Seguimento'] = df_analise['Seguimento'].fillna('NÃO INFORMADO').astype(str).str.upper()
         df_analise['Gestora'] = df_analise['Gestora'].fillna('NÃO INFORMADO').astype(str).str.upper()
 
-        # 🎯 NOVO LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
+        # 🎯 LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
         # Variáveis de controle para garantir simetria perfeita
@@ -447,16 +447,6 @@ with aba_alocacao:
                 fig_s.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
                 st.plotly_chart(fig_s, use_container_width=True)
 
-            # Insight ajustado para a coluna central
-            st.markdown("""
-                <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
-                    <strong style="color: #2C3E50; font-size: 13px;">💡 Dinâmica de Portfólio:</strong>
-                    <span style="color: #5D6D7E; font-size: 12.5px;"> 
-                        A coluna central mapeia a fundação da sua carteira. Verifique se o peso do segmento no gráfico inferior está adequado ao risco assumido na classificação superior (ex: indexadores fortes em papel vs. estabilidade em tijolo).
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-
         # ==============================================================================
         # COLUNA DIREITA (30%): EXPOSIÇÃO POR GESTORA
         # ==============================================================================
@@ -470,7 +460,6 @@ with aba_alocacao:
                     orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # Usa exatamente a mesma variável ALTURA_PILARES do gráfico de ativos
                 fig_bar_gest.update_layout(
                     margin=dict(l=75, r=10, t=10, b=10), height=ALTURA_PILARES,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
