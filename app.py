@@ -204,7 +204,10 @@ def carregar_e_processar_dados_carteira():
         
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
-        df_consolidado['Tipo'] = df_consolidado['Tipo'].fillna('OUTROS')
+        
+        # 🎯 AJUSTADO: Se a coluna Classificacao não vier preenchida para algum ticker, joga OUTROS
+        if 'Classificacao' in df_consolidado.columns:
+            df_consolidado['Classificacao'] = df_consolidado['Classificacao'].fillna('OUTROS')
         
         df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
         df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
@@ -236,11 +239,10 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-# 🎯 AJUSTADO: Nome da segunda aba alterado de 'Outras Análises' para 'Alocação'
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# ABA 1: RESUMO 
+# ABA 1: RESUMO
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -281,7 +283,7 @@ with aba_resumo:
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
-                <div style="color: {color_lucro}; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(lucro_total_kpi)}</div>
+                <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(lucro_total_kpi)}</div>
                 <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
                         <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">G. Cap:</span>
@@ -389,14 +391,16 @@ with aba_resumo:
             with col_t2:
                 st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             with col_f2:
-                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
+                # 🎯 Ajustado para ler 'Classificacao' se disponível na listagem lateral da primeira aba
+                col_filtro_macro = 'Classificacao' if 'Classificacao' in df_consolidado.columns else 'Tipo'
+                tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado[col_filtro_macro].unique())) if not df_consolidado.empty else ["Todos os tipos"]
                 filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed", key="filtro_aba1")
                 
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             df_rosca_filtrada = df_custodia_atual.copy()
             if filtro_tipo != "Todos os tipos" and not df_rosca_filtrada.empty:
-                df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada['Tipo'] == filtro_tipo]
+                df_rosca_filtrada = df_rosca_filtrada[df_rosca_filtrada[col_filtro_macro] == filtro_tipo]
 
             if not df_rosca_filtrada.empty:
                 df_rosca = df_rosca_filtrada.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
@@ -422,7 +426,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: RAIO-X DE ALOCAÇÃO (BLINDAGEM CONTRA COLUNAS AUSENTES)
+# ⚙️ ABA 2: RAIO-X DE ALOCAÇÃO (MAPEAMENTO TOTALMENTE ALINHADO COM O TEU EXCEL)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
@@ -430,32 +434,32 @@ with aba_alocacao:
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
         
-        # 🎯 BLINDAGEM AUTOMÁTICA: Se as colunas não existirem no Excel, criamos com 'NÃO INFORMADO'
-        if 'Tipo' not in df_analise.columns:
-            df_analise['Tipo'] = 'NÃO INFORMADO'
-        if 'Segmento' not in df_analise.columns:
-            df_analise['Segmento'] = 'NÃO INFORMADO'
+        # 🎯 AJUSTADO: Verificação com os nomes reais das colunas da tua planilha (Classificacao e Seguimento)
+        if 'Classificacao' not in df_analise.columns:
+            df_analise['Classificacao'] = 'NÃO INFORMADO'
+        if 'Seguimento' not in df_analise.columns:
+            df_analise['Seguimento'] = 'NÃO INFORMADO'
         if 'Gestora' not in df_analise.columns:
             df_analise['Gestora'] = 'NÃO INFORMADO'
             
-        # Tratamento rigoroso de strings e nulos
-        df_analise['Tipo'] = df_analise['Tipo'].fillna('NÃO INFORMADO').astype(str).str.upper()
-        df_analise['Segmento'] = df_analise['Segmento'].fillna('NÃO INFORMADO').astype(str).str.upper()
+        # Tratamento seguro contra valores nulos e strings para a agregação
+        df_analise['Classificacao'] = df_analise['Classificacao'].fillna('NÃO INFORMADO').astype(str).str.upper()
+        df_analise['Seguimento'] = df_analise['Seguimento'].fillna('NÃO INFORMADO').astype(str).str.upper()
         df_analise['Gestora'] = df_analise['Gestora'].fillna('NÃO INFORMADO').astype(str).str.upper()
         
-        # Montagem das 3 colunas paralelas
+        # Montagem dos 3 blocos em colunas paralelas e simétricas
         col_class, col_seg, col_gest = st.columns(3)
         
-        # --- COLUNA 1: CLASSIFICAÇÃO (TIPO DE ATIVO) ---
+        # --- COLUNA 1: CLASSIFICACAO (PAPEL / TIJOLO - COLUNA B DO TEU DRIVE) ---
         with col_class:
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:8px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>1. Por Classificação</h4>", unsafe_allow_html=True)
                 
-                df_g_tipo = df_analise.groupby('Tipo')['Patrimonio_Mercado_Ativo'].sum().reset_index()
+                df_g_tipo = df_analise.groupby('Classificacao')['Patrimonio_Mercado_Ativo'].sum().reset_index()
                 df_g_tipo = df_g_tipo.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
                 
                 total_tipo = df_g_tipo['Patrimonio_Mercado_Ativo'].sum()
-                labels_tipo = [f"<b>{r['Tipo']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_tipo)*100:.1f}%)" for _, r in df_g_tipo.iterrows()]
+                labels_tipo = [f"<b>{r['Classificacao']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_tipo)*100:.1f}%)" for _, r in df_g_tipo.iterrows()]
                 
                 fig_t = go.Figure(go.Pie(
                     labels=labels_tipo, values=df_g_tipo['Patrimonio_Mercado_Ativo'], hole=0.55,
@@ -467,20 +471,20 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_t, use_container_width=True)
                 
-        # --- COLUNA 2: SEGMENTO (SETOR) ---
+        # --- COLUNA 2: SEGUIMENTO (SETOR DO ATIVO) ---
         with col_seg:
             with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:8px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>2. Por Segmento</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='margin:0; padding-bottom:8px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>2. Por Seguimento</h4>", unsafe_allow_html=True)
                 
-                df_g_seg = df_analise.groupby('Segmento')['Patrimonio_Mercado_Ativo'].sum().reset_index()
+                df_g_seg = df_analise.groupby('Seguimento')['Patrimonio_Mercado_Ativo'].sum().reset_index()
                 df_g_seg = df_g_seg.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
                 
                 total_seg = df_g_seg['Patrimonio_Mercado_Ativo'].sum()
-                labels_seg = [f"<b>{r['Segmento']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_seg)*100:.1f}%)" for _, r in df_g_seg.iterrows()]
+                labels_seg = [f"<b>{r['Seguimento']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_seg)*100:.1f}%)" for _, r in df_g_seg.iterrows()]
                 
                 fig_s = go.Figure(go.Pie(
                     labels=labels_seg, values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
-                    textinfo='none', hovertemplate='<b>Setor:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
+                    textinfo='none', hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
                 fig_s.update_layout(
                     margin=dict(l=10, r=10, t=10, b=10), height=230, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
@@ -509,12 +513,12 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_g, use_container_width=True)
 
-        # Insights na base da aba
+        # Notas de Insight base
         st.markdown("""
             <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
                 <strong style="color: #2C3E50; font-size: 13px;">💡 Regra de Ouro para Rebalanceamento:</strong>
                 <span style="color: #5D6D7E; font-size: 12.5px;"> 
-                    Utilize os gráficos acima para identificar concentrações elevadas. Se uma única <b>Classe</b>, <b>Segmento</b> ou <b>Gestora</b> ultrapassar o seu limite pessoal de segurança (ex: 25% ou 30%), direcione os próximos aportes mensais para as fatias menores até trazer a carteira de volta ao equilíbrio macro, sem necessidade de vender ativos.
+                    Utilize os gráficos acima para identificar concentrações elevadas. Se uma única <b>Classificacao</b>, <b>Seguimento</b> ou <b>Gestora</b> ultrapassar o seu limite pessoal de segurança (ex: 25% ou 30%), direcione os próximos aportes mensais para as fatias menores até trazer a carteira de volta ao equilíbrio macro, sem necessidade de vender ativos.
                 </span>
             </div>
         """, unsafe_allow_html=True)
