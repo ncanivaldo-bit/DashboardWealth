@@ -352,7 +352,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (6PX ENTRE LINHA SUPERIOR E INFERIOR)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (6PX ENTRE AS ROSTAS E A GESTORA)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
@@ -426,7 +426,7 @@ with aba_alocacao:
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # 🎯 AJUSTADO: A margem negativa foi para -22px para calibrar a distância exata de 6px visíveis!
+            # 🎯 AGUSTADO: A margem negativa de -22px agora vai tracionar o bloco de baixo para cima perfeitamente
             st.markdown('<div style="margin-top: -22px;">', unsafe_allow_html=True)
 
             # LINHA INFERIOR DIREITA: Exposição por Gestora (height=310px)
