@@ -343,10 +343,38 @@ with aba_resumo:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             df_rosca = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
-            fig_p = go.Figure(go.Pie(labels=df_rosca['Ticker'], values=df_rosca['Patrimonio_Mercado_Ativo'], hole=0.55, textinfo='none'))
-            fig_p.update_layout(margin=dict(l=0, r=0, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)', showlegend=True, legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.68, font=dict(size=10)))
+            
+            # 1. Calculando os percentuais exatos para injetar no texto da legenda
+            total_patrimonio_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
+            df_rosca['Percentual'] = (df_rosca['Patrimonio_Mercado_Ativo'] / total_patrimonio_rosca * 100)
+            df_rosca['Label_Legenda'] = df_rosca['Ticker'] + ' - ' + df_rosca['Percentual'].map('{:.1f}%'.format).str.replace('.', ',')
+            
+            # 2. Configurando a rosca e restringindo a área de desenho (domain)
+            fig_p = go.Figure(go.Pie(
+                labels=df_rosca['Label_Legenda'], 
+                values=df_rosca['Patrimonio_Mercado_Ativo'], 
+                hole=0.55, 
+                textinfo='none',
+                domain=dict(x=[0, 0.60]), # A rosca ocupará apenas 60% do espaço à esquerda
+                hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
+            ))
+            
+            # 3. Posicionando a legenda na área livre à direita
+            fig_p.update_layout(
+                margin=dict(l=0, r=0, t=10, b=10), 
+                height=260, 
+                paper_bgcolor='rgba(0,0,0,0)', 
+                showlegend=True, 
+                legend=dict(
+                    orientation="v", 
+                    yanchor="middle", 
+                    y=0.5, 
+                    xanchor="left", 
+                    x=0.62, # Posiciona a legenda no corredor criado pelo domain
+                    font=dict(size=10)
+                )
+            )
             st.plotly_chart(fig_p, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 with aba_alocacao:
     if not df_custodia_atual.empty:
