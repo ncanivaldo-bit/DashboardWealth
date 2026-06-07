@@ -14,13 +14,10 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO DEFINITIVAMENTE O VÁCUO ENTRE AS ABAS E OS CONTEÚDOS
+# 🎯 INJEÇÃO CSS COMPLETA
 st.markdown("""
     <style>
-        /* 1. Remove a barra de cabeçalho transparente nativa */
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
-        
-        /* 2. Zera o recuo superior e força o preenchimento total da largura da tela */
         [data-testid="stMainBlockContainer"] {
             padding-top: 0.8rem !important;
             padding-bottom: 0.8rem !important;
@@ -28,40 +25,29 @@ st.markdown("""
             padding-right: 1rem !important;
             max-width: 100% !important;
         }
-        
-        /* 3. Puxa a linha das abas para cima, colando no título PREVPRIV */
         [data-testid="stTabs"] {
             margin-top: -25px !important;
             margin-bottom: 0px !important;
         }
-        
-        /* 🎯 TRAVA GLOBAL: Zera o espaço invisível e força TODO o conteúdo de AMBAS as abas a SUBIR colado na linha em 7px */
         [data-testid="stTabPanel"] {
             padding-top: 0rem !important;
             margin-top: -35px !important;
         }
-        
-        /* 4. Cola o título "PREVPRIV" no topo absoluto do navegador */
         h1 { 
             margin-top: -25px !important; 
             margin-bottom: 5px !important; 
             font-size: 26px !important; 
             font-weight: 700 !important;
         }
-        
-        /* 5. Oculta os menus e botões da plataforma */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
-        
-        /* 6. Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# Título direto no topo
 st.title("PREVPRIV")
 
 # ==============================================================================
@@ -229,11 +215,11 @@ aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 with aba_alocacao:
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
-        # Garante colunas de texto
-        for col in ['Classificacao', 'Seguimento', 'Gestora']:
-            if col not in df_analise.columns: df_analise[col] = 'NÃO INFORMADO'
-            df_analise[col] = df_analise[col].fillna('NÃO INFORMADO').astype(str).str.upper()
-
+        
+        if 'Classificacao' not in df_analise.columns: df_analise['Classificacao'] = 'NÃO INFORMADO'
+        if 'Seguimento' not in df_analise.columns: df_analise['Seguimento'] = 'NÃO INFORMADO'
+        if 'Gestora' not in df_analise.columns: df_analise['Gestora'] = 'NÃO INFORMADO'
+            
         col_super_esq, col_super_dir = st.columns([4, 6])
         
         with col_super_esq:
@@ -263,15 +249,10 @@ with aba_alocacao:
                     fig_s = go.Figure(go.Pie(labels=df_g_seg['Seguimento'], values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55, textinfo='label+percent'))
                     fig_s.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=200, showlegend=False)
                     st.plotly_chart(fig_s, use_container_width=True)
-
-            # 🎯 AJUSTE DE 6PX: Margin-top de -28px traciona o gráfico da Gestora para cima
-            st.markdown('<div style="margin-top: -28px;"></div>', unsafe_allow_html=True)
             
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
                 df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index()
-                fig_bar_gest = go.Figure(go.Bar(
-                    x=df_g_gest['Patrimonio_Mercado_Ativo'], y=df_g_gest['Gestora'], orientation='h', marker_color='#118DFF'
-                ))
-                fig_bar_gest.update_layout(margin=dict(l=75, r=15, t=0, b=5), height=330, yaxis=dict(type='category'))
+                fig_bar_gest = go.Figure(go.Bar(x=df_g_gest['Patrimonio_Mercado_Ativo'], y=df_g_gest['Gestora'], orientation='h', marker_color='#118DFF'))
+                fig_bar_gest.update_layout(margin=dict(l=75, r=15, t=10, b=10), height=310, yaxis=dict(type='category'))
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
