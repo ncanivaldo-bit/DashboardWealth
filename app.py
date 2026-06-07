@@ -394,14 +394,18 @@ with aba_alocacao:
         # 🎯 LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
-        # 🎯 ALINHAMENTO FINO COM BASE NA IMAGEM: 
-        # Laterais intocadas (440). 
-        # Meio ajustado para 190 (o ponto de equilíbrio entre faltar e sobrar espaço).
+        # 📏 CÁLCULO EXATO DE SIMETRIA:
+        # A altura dos pilares laterais dita a regra geral.
         ALTURA_PILARES = 440 
-        ALTURA_ROSCAS = 190
+        
+        # O overhead soma o espaço ocupado por: 2 títulos h4, margens internas, bordas e o gap de 0.3rem
+        OVERHEAD_STREAMLIT = 80 
+        
+        # O Python calcula automaticamente a altura das roscas garantindo o nivelamento
+        ALTURA_ROSCAS = (ALTURA_PILARES - OVERHEAD_STREAMLIT) / 2
         
         # ==============================================================================
-        # COLUNA ESQUERDA (30%): EXPOSIÇÃO POR ATIVO (INTOCADA)
+        # COLUNA ESQUERDA (30%): EXPOSIÇÃO POR ATIVO
         # ==============================================================================
         with col_esq:
             with st.container(border=True):
@@ -422,7 +426,7 @@ with aba_alocacao:
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
         # ==============================================================================
-        # COLUNA DO MEIO (40%): CLASSIFICAÇÃO SOBRE SEGUIMENTO (AJUSTADA PARA 190)
+        # COLUNA DO MEIO (40%): CLASSIFICAÇÃO SOBRE SEGUIMENTO
         # ==============================================================================
         with col_meio:
             with st.container(border=True):
@@ -450,7 +454,7 @@ with aba_alocacao:
                 st.plotly_chart(fig_s, use_container_width=True)
 
         # ==============================================================================
-        # COLUNA DIREITA (30%): EXPOSIÇÃO POR GESTORA (INTOCADA)
+        # COLUNA DIREITA (30%): EXPOSIÇÃO POR GESTORA
         # ==============================================================================
         with col_dir:
             with st.container(border=True):
