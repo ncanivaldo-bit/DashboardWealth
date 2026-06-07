@@ -197,7 +197,7 @@ def carregar_e_processar_dados_carteira():
         df_mensal_ativos['Ano_Str'] = df_mensal_ativos['Data'].dt.strftime('%Y')
         
         df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
-        df_consolidado = pd.merge(df_consolidado, df_inf, on='Ticker', how='left') # Puxa todas as colunas de Inf_Ativos (incluindo Segmento e Gestora se houver)
+        df_consolidado = pd.merge(df_consolidado, df_inf, on='Ticker', how='left')
         
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
@@ -236,10 +236,11 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 # RENDERIZAÇÃO DA INTERFACE VISUAL
 # ==============================================================================
-aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
+# 🎯 AJUSTADO: Nome da segunda aba alterado de 'Outras Análises' para 'Alocação'
+aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# ABA 1: RESUMO (MANTIDA 100% INTACTA)
+# ABA 1: RESUMO 
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -421,20 +422,28 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: RAIO-X DE ALOCAÇÃO (SURPRESA E EXPOSIÇÃO DE RISCOS)
+# ⚙️ ABA 2: RAIO-X DE ALOCAÇÃO (BLINDAGEM CONTRA COLUNAS AUSENTES)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
-    # Ajuste de cabeçalho da aba, colado no topo
     st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
     
     if not df_custodia_atual.empty:
-        # Preenchimento preventivo de dados nulos nas colunas de agrupamento
         df_analise = df_custodia_atual.copy()
+        
+        # 🎯 BLINDAGEM AUTOMÁTICA: Se as colunas não existirem no Excel, criamos com 'NÃO INFORMADO'
+        if 'Tipo' not in df_analise.columns:
+            df_analise['Tipo'] = 'NÃO INFORMADO'
+        if 'Segmento' not in df_analise.columns:
+            df_analise['Segmento'] = 'NÃO INFORMADO'
+        if 'Gestora' not in df_analise.columns:
+            df_analise['Gestora'] = 'NÃO INFORMADO'
+            
+        # Tratamento rigoroso de strings e nulos
         df_analise['Tipo'] = df_analise['Tipo'].fillna('NÃO INFORMADO').astype(str).str.upper()
         df_analise['Segmento'] = df_analise['Segmento'].fillna('NÃO INFORMADO').astype(str).str.upper()
         df_analise['Gestora'] = df_analise['Gestora'].fillna('NÃO INFORMADO').astype(str).str.upper()
         
-        # 📊 Criando as 3 colunas milimetricamente distribuídas e simétricas
+        # Montagem das 3 colunas paralelas
         col_class, col_seg, col_gest = st.columns(3)
         
         # --- COLUNA 1: CLASSIFICAÇÃO (TIPO DE ATIVO) ---
@@ -500,7 +509,7 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_g, use_container_width=True)
 
-        # 💡 Nota de Insights na base da aba para guiar decisões de rebalanceamento
+        # Insights na base da aba
         st.markdown("""
             <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
                 <strong style="color: #2C3E50; font-size: 13px;">💡 Regra de Ouro para Rebalanceamento:</strong>
