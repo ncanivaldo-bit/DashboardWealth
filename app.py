@@ -352,7 +352,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (6PX ENTRE AS ROSTAS E A GESTORA)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (6PX DE DISTÂNCIA TRAVADOS E APLICADOS)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
@@ -426,8 +426,9 @@ with aba_alocacao:
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # 🎯 AGUSTADO: A margem negativa de -22px agora vai tracionar o bloco de baixo para cima perfeitamente
-            st.markdown('<div style="margin-top: -22px;">', unsafe_allow_html=True)
+            # 🎯 AGORA SIM CORRIGIDO: Injetando a margem HTML forçada de -32px diretamente com a tag inline div do Streamlit.
+            # Isso traciona o bloco de baixo para cima cravando os 6px visíveis de vácuo entre as bordas!
+            st.markdown('<div style="margin-top: -32px !important;">', unsafe_allow_html=True)
 
             # LINHA INFERIOR DIREITA: Exposição por Gestora (height=310px)
             with st.container(border=True):
@@ -446,6 +447,7 @@ with aba_alocacao:
                     yaxis=dict(type='category')
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Insights na base da aba
         st.markdown("""
