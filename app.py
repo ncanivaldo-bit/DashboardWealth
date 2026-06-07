@@ -428,8 +428,8 @@ with aba_alocacao:
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # Mantemos o recuo mecânico estável
-            st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
+            # Mantemos o recuo mecânico estável (Aqui foi feita a troca de -12px para -32px)
+            st.markdown('<div style="margin-top: -32px;">', unsafe_allow_html=True)
 
             # ==============================================================================
             # 🏢 🎯 GRÁFICO DA GESTORA ESTICADO INTERNAMENTE PARA CIMA (t=0, b=5)
