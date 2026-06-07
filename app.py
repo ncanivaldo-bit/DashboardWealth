@@ -14,7 +14,6 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS COMPLETA
 st.markdown("""
     <style>
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
@@ -88,7 +87,6 @@ def download_excel_from_drive(file_id, sheet_name=0):
 # 3. MOTOR DE RACIOCÍNIO - MÓDULOS DE TRANSFORMAÇÃO (ETL)
 # ==============================================================================
 def calcular_historico_posicoes(df_trades):
-    """Processa iterativamente o histórico para encontrar o preço médio exato."""
     carteira = {}
     historico_detalhado = []
     
@@ -123,27 +121,29 @@ def calcular_historico_posicoes(df_trades):
             carteira[ticker]['custo_total'] = 0.0
             carteira[ticker]['preco_medio'] = 0.0
             
-        historico_detalhado.append({
-            'Data': data,
-            'Ticker': ticker,
-            'Quantidade': carteira[ticker]['quantidade'],
-            'Custo_Total': carteira[ticker]['custo_total']
-        })
+        # CORREÇÃO: Restaurada a lógica original de fotografar a carteira inteira a cada evento
+        for tk, dados in carteira.items():
+            historico_detalhado.append({
+                'Data': data,
+                'Ticker': tk,
+                'Quantidade': dados['quantidade'],
+                'Custo_Total': dados['custo_total']
+            })
         
     return pd.DataFrame(historico_detalhado)
 
 def extrair_kpis_proventos(df_mov):
-    """Filtra e totaliza os proventos recebidos."""
     termos_proventos = ['Dividendo', 'JCP', 'Rendimento', 'Provento']
     df_proventos = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
-    total_dividendos_historico = float(df_proventos['Valor_Operacao_Num'].sum()) if not df_proventos.empty else 0.0
+    # Voltando a usar a coluna original 'Valor da Operação' para evitar qualquer desvio
+    total_dividendos_historico = float(df_proventos['Valor da Operação'].sum()) if not df_proventos.empty else 0.0
     ultimo_provento_valor = 0.0
     ultimo_provento_mes_ano = "-"
     
     if not df_proventos.empty and not df_proventos['Data_Datetime'].isna().all():
         df_proventos['AnoMes'] = df_proventos['Data_Datetime'].dt.to_period('M')
-        proventos_por_mes = df_proventos.groupby('AnoMes')['Valor_Operacao_Num'].sum().sort_index()
+        proventos_por_mes = df_proventos.groupby('AnoMes')['Valor da Operação'].sum().sort_index()
         if not proventos_por_mes.empty:
             ultimo_provento_valor = float(proventos_por_mes.iloc[-1])
             ultimo_provento_mes_ano = proventos_por_mes.index[-1].strftime('%m/%Y')
@@ -157,12 +157,10 @@ def extrair_kpis_proventos(df_mov):
 def orquestrar_pipeline_carteira():
     ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
     
-    # 1. Extração
     df_mov = download_excel_from_drive(ID_UNIFICADO, sheet_name='Movimentacao')
     df_inf = download_excel_from_drive(ID_UNIFICADO, sheet_name='Inf_Ativos')
     df_precos_historicos = download_excel_from_drive(ID_UNIFICADO, sheet_name='Hist_Precos')
     
-    # 2. Limpeza Primária
     for df in [df_mov, df_inf, df_precos_historicos]:
         df.columns = df.columns.astype(str).str.strip()
         if 'Ticker' in df.columns:
@@ -184,14 +182,12 @@ def orquestrar_pipeline_carteira():
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
     df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
 
-    # 3. Transformação Customizada
     eventos_custodia = ['Compra', 'Venda', 'Desdobro']
     df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
     
     df_hist_ativos = calcular_historico_posicoes(df_trades)
     total_dividendos, ult_provento_val, ult_provento_mes = extrair_kpis_proventos(df_mov)
     
-    # 4. Fechamento Mensal e Consolidação
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
         df_mensal_ativos = (df_hist_ativos
@@ -225,11 +221,9 @@ def orquestrar_pipeline_carteira():
 # 5. EXECUÇÃO DA INTERFACE VISUAL
 # ==============================================================================
 
-# ⏳ Feedback Visual durante o carregamento dos dados
 with st.spinner('Sincronizando custódia com a nuvem...'):
     df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = orquestrar_pipeline_carteira()
 
-# Cálculos de KPIs Gerais
 total_investido_kpi = 0.0
 patrimonio_mercado_kpi = 0.0
 ganho_capital_kpi = 0.0
@@ -250,9 +244,6 @@ if not df_custodia_atual.empty:
 
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
-# ------------------------------------------------------------------------------
-# 📝 ABA 1: RESUMO 
-# ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
         prefixo = "-" if v < 0 else ""
@@ -357,9 +348,6 @@ with aba_resumo:
             st.plotly_chart(fig_p, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
-# ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
