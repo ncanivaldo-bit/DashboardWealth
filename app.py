@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS PARA LARGURA TOTAL, TOPO ABSOLUTO E RECUOS NATIVOS DO STREAMLIT
+# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO O VÁCUO NATIVO ENTRE AS ABAS E OS GRÁFICOS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -32,6 +32,13 @@ st.markdown("""
         /* 3. Puxa a linha das abas para cima, colando no título PREVPRIV */
         [data-testid="stTabs"] {
             margin-top: -25px !important;
+            margin-bottom: 0px !important;
+        }
+        
+        /* 🎯 NOVO: Zera o espaço invisível que o Streamlit cria embaixo da linha das abas */
+        [data-testid="stTabPanel"] {
+            padding-top: 0rem !important;
+            margin-top: -20px !important;
         }
         
         /* 4. Cola o título "PREVPRIV" no topo absoluto do navegador */
@@ -347,11 +354,10 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (MÁXIMA SUBIDA COM ESPAÇAMENTO RECALIBRADO EM 7PX)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (COM OS GRÁFICOS COLADOS EM 7PX DE VERDADE)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
-    # 🎯 ALTERADO: A margem superior negativa foi para -18px para puxar os gráficos para cima, deixando o vão livre exato de 7px!
-    st.markdown("<div style='margin-top: -18px;'></div>", unsafe_allow_html=True)
+    # 🎯 O CSS global injetado lá no topo agora assume o controle e mata o vácuo cinza nativo.
     
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
