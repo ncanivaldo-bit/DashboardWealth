@@ -35,13 +35,9 @@ st.markdown("""
     margin-top: -10px !important;
 }
 
-h1 {
-    margin-top: -20px !important;
-}
+h1 { margin-top: -20px !important; }
 
-#MainMenu, footer, header {
-    visibility: hidden;
-}
+#MainMenu, footer, header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,12 +91,23 @@ def carregar_dados():
     df_inf = download_excel_from_drive(ID, 'Inf_Ativos')
     df_hist = download_excel_from_drive(ID, 'Hist_Precos')
 
+    # 🔥 CORREÇÃO PRINCIPAL (tipo numérico)
+    if 'Preco_Atual' in df_inf.columns:
+        df_inf['Preco_Atual'] = (
+            df_inf['Preco_Atual']
+            .astype(str)
+            .str.replace('R$', '', regex=False)
+            .str.replace('.', '', regex=False)
+            .str.replace(',', '.', regex=False)
+        )
+        df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
+
     return df_mov, df_inf, df_hist
 
 df_mov, df_inf, df_hist = carregar_dados()
 
 # ==============================================================================
-# ABA
+# ABAS
 # ==============================================================================
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
@@ -108,16 +115,19 @@ aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 # RESUMO
 # ------------------------------------------------------------------------------
 with aba_resumo:
-    st.write("Resumo carregado normalmente")
+    st.write("Resumo mantido como está (sem alterações)")
 
 # ------------------------------------------------------------------------------
-# ALOCAÇÃO (COM AJUSTES CORRETOS)
+# ALOCAÇÃO
 # ------------------------------------------------------------------------------
 with aba_alocacao:
 
     if not df_inf.empty:
 
         df = df_inf.copy()
+
+        # Garantia adicional (segurança)
+        df['Preco_Atual'] = pd.to_numeric(df['Preco_Atual'], errors='coerce').fillna(0)
 
         if 'Classificacao' not in df.columns:
             df['Classificacao'] = 'NÃO INFORMADO'
@@ -128,87 +138,35 @@ with aba_alocacao:
         if 'Gestora' not in df.columns:
             df['Gestora'] = 'NÃO INFORMADO'
 
-        col1, col2 = st.columns([4,6])
+        col_esq, col_dir = st.columns([4,6])
 
+        # =========================================================
         # ESQUERDA
-        with col1:
+        # =========================================================
+        with col_esq:
             with st.container(border=True):
 
                 df_sorted = df.sort_values(by='Preco_Atual', ascending=True)
 
-                fig1 = go.Figure(go.Bar(
+                fig_bar_ativos = go.Figure(go.Bar(
                     x=df_sorted['Preco_Atual'],
                     y=df_sorted['Ticker'],
-                    orientation='h'
+                    orientation='h',
+                    marker_color='#1fbc74'
                 ))
 
-                fig1.update_layout(
-                    height=540,
-                    margin=dict(l=60, r=10, t=10, b=10)
+                fig_bar_ativos.update_layout(
+                    margin=dict(l=65, r=15, t=10, b=10),
+                    height=540
                 )
 
-                st.plotly_chart(fig1, use_container_width=True)
+                st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
+        # =========================================================
         # DIREITA
-        with col2:
+        # =========================================================
+        with col_dir:
 
-            col_a, col_b = st.columns(2)
+            col_class, col_seg = st.columns(2)
 
-            # CLASSIFICAÇÃO
-            with col_a:
-                with st.container(border=True):
 
-                    df_tipo = df.groupby('Classificacao')['Preco_Atual'].sum().reset_index()
-
-                    fig2 = go.Figure(go.Pie(
-                        labels=df_tipo['Classificacao'],
-                        values=df_tipo['Preco_Atual'],
-                        hole=0.55
-                    ))
-
-                    fig2.update_layout(
-                        height=210,
-                        margin=dict(l=5, r=5, t=10, b=0)
-                    )
-
-                    st.plotly_chart(fig2, use_container_width=True)
-
-            # SEGUIMENTO
-            with col_b:
-                with st.container(border=True):
-
-                    df_seg = df.groupby('Seguimento')['Preco_Atual'].sum().reset_index()
-
-                    fig3 = go.Figure(go.Pie(
-                        labels=df_seg['Seguimento'],
-                        values=df_seg['Preco_Atual'],
-                        hole=0.55
-                    ))
-
-                    fig3.update_layout(
-                        height=210,
-                        margin=dict(l=5, r=5, t=10, b=0)
-                    )
-
-                    st.plotly_chart(fig3, use_container_width=True)
-
-            # GESTORA
-            with st.container(border=True):
-
-                df_gest = df.groupby('Gestora')['Preco_Atual'].sum().reset_index()
-
-                fig4 = go.Figure(go.Bar(
-                    x=df_gest['Preco_Atual'],
-                    y=df_gest['Gestora'],
-                    orientation='h'
-                ))
-
-                fig4.update_layout(
-                    height=320,
-                    margin=dict(l=70, r=10, t=10, b=0)
-                )
-
-                st.plotly_chart(fig4, use_container_width=True)
-
-    else:
-        st.info("Sem dados disponíveis.")
