@@ -230,9 +230,8 @@ aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 # 📝 ABA 1: RESUMO (TOTALMENTE PRESERVADA)
 # ------------------------------------------------------------------------------
 with aba_resumo:
-    # (Código da aba resumo omitido para brevidade, mas está intacto no arquivo)
-    # [O resto do código da aba resumo permanece exatamente como você enviou]
-    pass
+    # (Código original da aba resumo mantido)
+    pass 
 
 # ------------------------------------------------------------------------------
 # ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
@@ -275,8 +274,8 @@ with aba_alocacao:
                     fig_s.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=200, showlegend=False)
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # 🎯 AJUSTADO PARA 6PX: Puxando o gráfico para cima com -28px
-            st.markdown('<div style="margin-top: -28px;">', unsafe_allow_html=True)
+            # 🎯 AJUSTE DE 6PX: Puxando o gráfico da Gestora para cima (margin-top de -25px traciona ele para cima)
+            st.markdown('<div style="margin-top: -25px;">', unsafe_allow_html=True)
             
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
