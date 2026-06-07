@@ -317,7 +317,7 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
+    # Margem inversa unificada puxa os gráficos para cima de forma estrita
     st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
 
     # ==============================================================================
@@ -348,13 +348,7 @@ with aba_resumo:
                 
                 df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
                 df_totais_mensais['Valor_Aplicado'] = df_totais_mensais['Custo_Total']
-                # 🎯 CORRIGIDO: Linha restaurada por completo
                 df_totais_mensais['Ganho_de_Capital'] = df_totais_mensais['Patrimonio_Mercado_Ativo'] - df_totais_mensais['Custo_Total']
-
-                # Lógica de limites estritos e protegidos
-                menor_ganho_historico = float(df_totais_mensais['Ganho_de_Capital'].min())
-                limite_fundo = (menor_ganho_historico * 1.3) if menor_ganho_historico < 0 else -30000.0
-                limite_topo = patrimonio_mercado_kpi * 1.20
 
                 fig_barras = go.Figure()
                 fig_barras.add_trace(go.Bar(
@@ -372,6 +366,7 @@ with aba_resumo:
                     hovertemplate='<b>Ganho Cap:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
+                # 🎯 TRAVAMENTO ABSOLUTO: Eixo Y fixado estritamente de -50k a 300k. Fundo aberto e topo estendido sem falha.
                 fig_barras.update_layout(
                     margin=dict(l=45, r=10, t=25, b=10),
                     height=260, 
@@ -385,7 +380,7 @@ with aba_resumo:
                         tickprefix="R$ ", 
                         tickformat="~s",  
                         nticks=6,
-                        range=[limite_fundo, limite_topo]
+                        range=[-50000, 300000]
                     ),
                     xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
                     legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
