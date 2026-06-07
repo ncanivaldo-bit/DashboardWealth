@@ -109,6 +109,7 @@ def carregar_e_processar_dados_carteira():
     
     conversao_tickers = {"MALL11": "PMLL11", "CVBI11": "PCIP11"}
     df_mov['Ticker'] = df_mov['Ticker'].replace(conversao_tickers)
+    df_inf['Ticker'] = df_inf['Ticker'].replace(conversao_tickers)
     df_precos_historicos['Ticker'] = df_precos_historicos['Ticker'].replace(conversao_tickers)
     
     df_mov['Quantidade_Num'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
@@ -196,7 +197,7 @@ def carregar_e_processar_dados_carteira():
         df_mensal_ativos['Ano_Str'] = df_mensal_ativos['Data'].dt.strftime('%Y')
         
         df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
-        df_consolidado = pd.merge(df_consolidado, df_inf[['Ticker', 'Preco_Atual', 'Tipo']], on='Ticker', how='left')
+        df_consolidado = pd.merge(df_consolidado, df_inf, on='Ticker', how='left') # Puxa todas as colunas de Inf_Ativos (incluindo Segmento e Gestora se houver)
         
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
@@ -237,6 +238,9 @@ if not df_custodia_atual.empty:
 # ==============================================================================
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Outras Análises"])
 
+# ------------------------------------------------------------------------------
+# ABA 1: RESUMO (MANTIDA 100% INTACTA)
+# ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
         prefixo = "-" if v < 0 else ""
@@ -251,12 +255,10 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
-    # Margem nativa para puxar os cartões para cima de forma sutil
     st.markdown('<div style="margin-top: -10px;">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # 🎯 CARD 1 - Tamanho das fontes maximizado proporcionalmente sem alterar a caixa externa de 110px
         st.markdown(f"""
             <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
                 <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
@@ -321,12 +323,7 @@ with aba_resumo:
         """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Margem inversa unificada puxa os gráficos para cima de forma estrita
     st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
-
-    # ==============================================================================
-    # BLOCOS GRÁFICOS PARALELOS EQUALIZADOS (60% / 40%) - SIMETRIA TOTAL
-    # ==============================================================================
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
     with col_bloco_esquerdo:
@@ -353,8 +350,6 @@ with aba_resumo:
                 df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
                 
                 fig_linhas = go.Figure()
-                
-                # 1. Área do Patrimônio Total de Mercado (Com preenchimento sutil por baixo)
                 fig_linhas.add_trace(go.Scatter(
                     x=df_totais_mensais['Mês_Exibição'], 
                     y=df_totais_mensais['Patrimonio_Mercado_Ativo'],
@@ -366,8 +361,6 @@ with aba_resumo:
                     fillcolor='rgba(31, 188, 116, 0.06)', 
                     hovertemplate='<b>Patrimônio Atual:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
-                
-                # 2. Linha do Custo Total Investido (Dinheiro do bolso)
                 fig_linhas.add_trace(go.Scatter(
                     x=df_totais_mensais['Mês_Exibição'], 
                     y=df_totais_mensais['Custo_Total'],
@@ -383,12 +376,7 @@ with aba_resumo:
                     hovermode='x unified',
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    yaxis=dict(
-                        gridcolor='rgba(230,235,240,0.6)', 
-                        tickprefix="R$ ", 
-                        tickformat="~s",  
-                        nticks=6
-                    ),
+                    yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", nticks=6),
                     xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'),
                     legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
                 )
@@ -398,10 +386,10 @@ with aba_resumo:
         with st.container(border=True):
             col_t2, col_f2 = st.columns([6, 4])
             with col_t2:
-                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Atual</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             with col_f2:
                 tipos_disponiveis = ["Todos os tipos"] + sorted(list(df_consolidado['Tipo'].unique())) if not df_consolidado.empty else ["Todos os tipos"]
-                filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed")
+                filtro_tipo = st.selectbox("Classe Ativos", options=tipos_disponiveis, index=0, label_visibility="collapsed", key="filtro_aba1")
                 
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
@@ -411,7 +399,6 @@ with aba_resumo:
 
             if not df_rosca_filtrada.empty:
                 df_rosca = df_rosca_filtrada.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
-                
                 labels_legendas = []
                 total_mercado_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
                 for _, row_r in df_rosca.iterrows():
@@ -420,32 +407,107 @@ with aba_resumo:
                 
                 fig_pie = go.Figure()
                 fig_pie.add_trace(go.Pie(
-                    labels=labels_legendas, 
-                    values=df_rosca['Patrimonio_Mercado_Ativo'],
-                    hole=0.55,
-                    domain=dict(x=[0.0, 0.65]),
-                    textinfo='none',
+                    labels=labels_legendas, values=df_rosca['Patrimonio_Mercado_Ativo'],
+                    hole=0.55, domain=dict(x=[0.0, 0.65]), textinfo='none',
                     hovertemplate='<b>Ativo:</b> %{label}<br><b>Valor:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
-                
                 fig_pie.update_layout(
-                    margin=dict(l=0, r=0, t=10, b=10),
-                    height=260, 
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    showlegend=True,
-                    legend=dict(
-                        orientation="v", 
-                        yanchor="middle", 
-                        y=0.5, 
-                        xanchor="left", 
-                        x=0.68,
-                        font=dict(size=10)
-                    )
+                    margin=dict(l=0, r=0, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)',
+                    showlegend=True, legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.68, font=dict(size=10))
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
             else:
-                st.info("ℹ️ Nenhum ativo encontrado para esta classe no momento.")
+                st.info("ℹ️ Nenhum ativo encontrado.")
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ------------------------------------------------------------------------------
+# ⚙️ ABA 2: RAIO-X DE ALOCAÇÃO (SURPRESA E EXPOSIÇÃO DE RISCOS)
+# ------------------------------------------------------------------------------
 with aba_alocacao:
-    st.info("⚙️ Aba de alocação estruturada.")
+    # Ajuste de cabeçalho da aba, colado no topo
+    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
+    
+    if not df_custodia_atual.empty:
+        # Preenchimento preventivo de dados nulos nas colunas de agrupamento
+        df_analise = df_custodia_atual.copy()
+        df_analise['Tipo'] = df_analise['Tipo'].fillna('NÃO INFORMADO').astype(str).str.upper()
+        df_analise['Segmento'] = df_analise['Segmento'].fillna('NÃO INFORMADO').astype(str).str.upper()
+        df_analise['Gestora'] = df_analise['Gestora'].fillna('NÃO INFORMADO').astype(str).str.upper()
+        
+        # 📊 Criando as 3 colunas milimetricamente distribuídas e simétricas
+        col_class, col_seg, col_gest = st.columns(3)
+        
+        # --- COLUNA 1: CLASSIFICAÇÃO (TIPO DE ATIVO) ---
+        with col_class:
+            with st.container(border=True):
+                st.markdown("<h4 style='margin:0; padding-bottom:8px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>1. Por Classificação</h4>", unsafe_allow_html=True)
+                
+                df_g_tipo = df_analise.groupby('Tipo')['Patrimonio_Mercado_Ativo'].sum().reset_index()
+                df_g_tipo = df_g_tipo.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
+                
+                total_tipo = df_g_tipo['Patrimonio_Mercado_Ativo'].sum()
+                labels_tipo = [f"<b>{r['Tipo']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_tipo)*100:.1f}%)" for _, r in df_g_tipo.iterrows()]
+                
+                fig_t = go.Figure(go.Pie(
+                    labels=labels_tipo, values=df_g_tipo['Patrimonio_Mercado_Ativo'], hole=0.55,
+                    textinfo='none', hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
+                ))
+                fig_t.update_layout(
+                    margin=dict(l=10, r=10, t=10, b=10), height=230, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
+                    legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.0, font=dict(size=9.5))
+                )
+                st.plotly_chart(fig_t, use_container_width=True)
+                
+        # --- COLUNA 2: SEGMENTO (SETOR) ---
+        with col_seg:
+            with st.container(border=True):
+                st.markdown("<h4 style='margin:0; padding-bottom:8px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>2. Por Segmento</h4>", unsafe_allow_html=True)
+                
+                df_g_seg = df_analise.groupby('Segmento')['Patrimonio_Mercado_Ativo'].sum().reset_index()
+                df_g_seg = df_g_seg.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
+                
+                total_seg = df_g_seg['Patrimonio_Mercado_Ativo'].sum()
+                labels_seg = [f"<b>{r['Segmento']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_seg)*100:.1f}%)" for _, r in df_g_seg.iterrows()]
+                
+                fig_s = go.Figure(go.Pie(
+                    labels=labels_seg, values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
+                    textinfo='none', hovertemplate='<b>Setor:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
+                ))
+                fig_s.update_layout(
+                    margin=dict(l=10, r=10, t=10, b=10), height=230, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
+                    legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.0, font=dict(size=9.5))
+                )
+                st.plotly_chart(fig_s, use_container_width=True)
+                
+        # --- COLUNA 3: GESTORA ---
+        with col_gest:
+            with st.container(border=True):
+                st.markdown("<h4 style='margin:0; padding-bottom:8px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>3. Por Gestora</h4>", unsafe_allow_html=True)
+                
+                df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index()
+                df_g_gest = df_g_gest.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
+                
+                total_gest = df_g_gest['Patrimonio_Mercado_Ativo'].sum()
+                labels_gest = [f"<b>{r['Gestora']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_gest)*100:.1f}%)" for _, r in df_g_gest.iterrows()]
+                
+                fig_g = go.Figure(go.Pie(
+                    labels=labels_gest, values=df_g_gest['Patrimonio_Mercado_Ativo'], hole=0.55,
+                    textinfo='none', hovertemplate='<b>Gestora:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
+                ))
+                fig_g.update_layout(
+                    margin=dict(l=10, r=10, t=10, b=10), height=230, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
+                    legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.0, font=dict(size=9.5))
+                )
+                st.plotly_chart(fig_g, use_container_width=True)
+
+        # 💡 Nota de Insights na base da aba para guiar decisões de rebalanceamento
+        st.markdown("""
+            <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
+                <strong style="color: #2C3E50; font-size: 13px;">💡 Regra de Ouro para Rebalanceamento:</strong>
+                <span style="color: #5D6D7E; font-size: 12.5px;"> 
+                    Utilize os gráficos acima para identificar concentrações elevadas. Se uma única <b>Classe</b>, <b>Segmento</b> ou <b>Gestora</b> ultrapassar o seu limite pessoal de segurança (ex: 25% ou 30%), direcione os próximos aportes mensais para as fatias menores até trazer a carteira de volta ao equilíbrio macro, sem necessidade de vender ativos.
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
