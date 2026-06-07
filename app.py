@@ -251,20 +251,23 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
+    # Margem nativa para puxar os cartões para cima de forma sutil
+    st.markdown('<div style="margin-top: -10px;">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        # 🎯 CARD 1 - Tamanho das fontes maximizado proporcionalmente sem alterar a caixa externa de 110px
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                <div style="color: #2C3E50; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(patrimonio_mercado_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
+                <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Investido:</span>
+                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Investido:</span>
                         <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong>
                     </div>
                     <div style="text-align: right;">
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Var:</span>
+                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Var:</span>
                         <strong style="color: {color_var};">{formatar_pct(variacao_carteira_pct)}</strong>
                     </div>
                 </div>
@@ -273,16 +276,16 @@ with aba_resumo:
         
     with col2:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
-                <div style="color: {color_lucro}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(lucro_total_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
+                <div style="color: {color_lucro}; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(lucro_total_kpi)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">G. Cap:</span>
+                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">G. Cap:</span>
                         <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong>
                     </div>
                     <div style="text-align: right;">
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Prov:</span>
+                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Prov:</span>
                         <strong style="color: #2E8B57;">{formatar_br(total_dividendos)}</strong>
                     </div>
                 </div>
@@ -291,12 +294,12 @@ with aba_resumo:
         
     with col3:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
-                <div style="color: #2E8B57; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_br(ult_provento_val)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
+                <div style="color: #2E8B57; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(ult_provento_val)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Mês de Ref:</span>
+                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Mês de Ref:</span>
                         <strong style="color: #34495E;">{ult_provento_mes}</strong>
                     </div>
                 </div>
@@ -305,19 +308,20 @@ with aba_resumo:
         
     with col4:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 11px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
-                <div style="color: {color_rent}; font-size: 22px; font-weight: 700; margin-top: 2px; margin-bottom: 2px;">{formatar_pct(rentabilidade_total_pct)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 11px; color: #7F8C8D; display: flex; justify-content: space-between;">
+            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
+                <div style="color: {color_rent}; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_pct(rentabilidade_total_pct)}</div>
+                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 10px; color: #7F8C8D; text-transform: uppercase;">Resultado Com:</span>
+                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Resultado Com:</span>
                         <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
+    # Margem inversa unificada puxa os gráficos para cima de forma estrita
     st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
 
     # ==============================================================================
@@ -348,7 +352,6 @@ with aba_resumo:
                 
                 df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
                 
-                # 🎯 CONSTRUÇÃO DO GRÁFICO DE LINHAS (ÁREA AVANÇADA)
                 fig_linhas = go.Figure()
                 
                 # 1. Área do Patrimônio Total de Mercado (Com preenchimento sutil por baixo)
@@ -360,7 +363,7 @@ with aba_resumo:
                     line=dict(color='#1fbc74', width=3),
                     marker=dict(size=6),
                     fill='tozeroy',
-                    fillcolor='rgba(31, 188, 116, 0.06)', # Sombra verde elegante
+                    fillcolor='rgba(31, 188, 116, 0.06)', 
                     hovertemplate='<b>Patrimônio Atual:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
@@ -370,11 +373,10 @@ with aba_resumo:
                     y=df_totais_mensais['Custo_Total'],
                     mode='lines',
                     name='Total Investido',
-                    line=dict(color='#118DFF', width=2, dash='dot'), # Linha pontilhada azul para referência
+                    line=dict(color='#118DFF', width=2, dash='dot'), 
                     hovertemplate='<b>Total Investido:</b> R$ %{y:,.2f}<extra></extra>'
                 ))
                 
-                # Layout simétrico em 260px com escala responsiva natural do Plotly
                 fig_linhas.update_layout(
                     margin=dict(l=45, r=10, t=25, b=10),
                     height=260, 
