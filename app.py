@@ -374,7 +374,7 @@ with aba_alocacao:
         col_super_esq, col_super_dir = st.columns([4, 6])
         
         # ==============================================================================
-        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (ALTURA REDUZIDA PARA 420px)
+        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (ALTURA AJUSTADA PARA SIMETRIA)
         # ==============================================================================
         with col_super_esq:
             with st.container(border=True):
@@ -386,9 +386,10 @@ with aba_alocacao:
                     orientation='h', marker_color='#1fbc74',
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida de 540 para 420px. Fonte dos nomes reduzida para 9px para caber todos.
+                # 🎯 AJUSTE DA SIMETRIA: A altura aqui foi aumentada de 420 para 495px para o fundo deste bloco alinhar perfeitamente com a caixinha de insights da direita.
+                # Se ainda precisar de um ajuste milimétrico para o seu monitor, você pode alterar esse número '495' para '490' ou '500'.
                 fig_bar_ativos.update_layout(
-                    margin=dict(l=65, r=15, t=10, b=10), height=420,
+                    margin=dict(l=65, r=15, t=10, b=10), height=495,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
                     yaxis=dict(type='category', dtick=1, tickfont=dict(size=9))
@@ -412,7 +413,6 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px para acompanhar a simetria com a esquerda
                     fig_t.update_layout(
                         margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
@@ -428,7 +428,6 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px
                     fig_s.update_layout(
                         margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
@@ -446,7 +445,6 @@ with aba_alocacao:
                     orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida para 210px. t=0 e b=5 sobem o gráfico por dentro.
                 fig_bar_gest.update_layout(
                     margin=dict(l=75, r=15, t=0, b=5), height=210,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
