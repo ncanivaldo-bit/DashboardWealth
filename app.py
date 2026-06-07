@@ -245,7 +245,7 @@ if not df_custodia_atual.empty:
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# 📝 ABA 1: RESUMO
+# 📝 ABA 1: RESUMO (TOTALMENTE PRESERVADA)
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -352,7 +352,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (6PX DE DISTÂNCIA TRAVADOS E APLICADOS)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (ESTRATÉGIA DE EXPANSÃO INTERNA CORES E MARGENS)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
@@ -406,8 +406,9 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
+                    # Retiramos qualquer margem excessiva da base do gráfico de pizza (b=0)
                     fig_t.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                        margin=dict(l=5, r=5, t=5, b=0), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_t, use_container_width=True)
                     
@@ -421,16 +422,18 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
+                    # Retiramos qualquer margem excessiva da base do gráfico de pizza (b=0)
                     fig_s.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                        margin=dict(l=5, r=5, t=5, b=0), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # 🎯 AGORA SIM CORRIGIDO: Injetando a margem HTML forçada de -32px diretamente com a tag inline div do Streamlit.
-            # Isso traciona o bloco de baixo para cima cravando os 6px visíveis de vácuo entre as bordas!
-            st.markdown('<div style="margin-top: -32px !important;">', unsafe_allow_html=True)
+            # Mantemos o recuo mecânico estável
+            st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
 
-            # LINHA INFERIOR DIREITA: Exposição por Gestora (height=310px)
+            # ==============================================================================
+            # 🏢 🎯 GRÁFICO DA GESTORA ESTICADO INTERNAMENTE PARA CIMA (t=0, b=5)
+            # ==============================================================================
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
                 df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
@@ -440,8 +443,10 @@ with aba_alocacao:
                     orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
+                # 🎯 SOLUÇÃO DEFINITIVA: t=0 (esticou o gráfico para cima) e b=5 (diminuiu o espaço embaixo)
+                # Altura total elevada para 330px para trancar o alinhamento reto com o lado esquerdo
                 fig_bar_gest.update_layout(
-                    margin=dict(l=75, r=15, t=10, b=10), height=310,
+                    margin=dict(l=75, r=15, t=0, b=5), height=330,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
                     yaxis=dict(type='category')
