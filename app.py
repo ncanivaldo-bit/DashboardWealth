@@ -121,7 +121,6 @@ def calcular_historico_posicoes(df_trades):
             carteira[ticker]['custo_total'] = 0.0
             carteira[ticker]['preco_medio'] = 0.0
             
-        # CORREÇÃO: Restaurada a lógica original de fotografar a carteira inteira a cada evento
         for tk, dados in carteira.items():
             historico_detalhado.append({
                 'Data': data,
@@ -136,7 +135,6 @@ def extrair_kpis_proventos(df_mov):
     termos_proventos = ['Dividendo', 'JCP', 'Rendimento', 'Provento']
     df_proventos = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
-    # Voltando a usar a coluna original 'Valor da Operação' para evitar qualquer desvio
     total_dividendos_historico = float(df_proventos['Valor da Operação'].sum()) if not df_proventos.empty else 0.0
     ultimo_provento_valor = 0.0
     ultimo_provento_mes_ano = "-"
@@ -242,8 +240,14 @@ if not df_custodia_atual.empty:
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
+# Configuração global de segurança para celular (oculta barra de ferramentas)
+MOBILE_CONFIG = {'displayModeBar': False}
+
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
+# ------------------------------------------------------------------------------
+# 📝 ABA 1: RESUMO 
+# ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
         prefixo = "-" if v < 0 else ""
@@ -336,45 +340,31 @@ with aba_resumo:
             fig_linhas = go.Figure()
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Patrimonio_Mercado_Ativo'], mode='lines+markers', name='Patrimônio Atual', line=dict(color='#1fbc74', width=3), marker=dict(size=6), fill='tozeroy', fillcolor='rgba(31, 188, 116, 0.06)'))
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Custo_Total'], mode='lines', name='Total Investido', line=dict(color='#118DFF', width=2, dash='dot')))
-            fig_linhas.update_layout(margin=dict(l=45, r=10, t=25, b=10), height=260, hovermode='x unified', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
-            st.plotly_chart(fig_linhas, use_container_width=True)
+            
+            # Trava Antidistorção
+            fig_linhas.update_layout(dragmode=False, margin=dict(l=45, r=10, t=25, b=10), height=260, hovermode='x unified', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", nticks=6, fixedrange=True), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category', fixedrange=True), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
+            st.plotly_chart(fig_linhas, use_container_width=True, config=MOBILE_CONFIG)
 
     with col_bloco_direito:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
-            df_rosca = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
+            df_rosca_resumo = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
             
-            # 1. Calculando os percentuais exatos para injetar no texto da legenda
-            total_patrimonio_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
-            df_rosca['Percentual'] = (df_rosca['Patrimonio_Mercado_Ativo'] / total_patrimonio_rosca * 100)
-            df_rosca['Label_Legenda'] = df_rosca['Ticker'] + ' - ' + df_rosca['Percentual'].map('{:.1f}%'.format).str.replace('.', ',')
+            total_patrimonio_rosca = df_rosca_resumo['Patrimonio_Mercado_Ativo'].sum()
+            df_rosca_resumo['Percentual'] = (df_rosca_resumo['Patrimonio_Mercado_Ativo'] / total_patrimonio_rosca * 100)
+            df_rosca_resumo['Label_Legenda'] = df_rosca_resumo['Ticker'] + ' - ' + df_rosca_resumo['Percentual'].map('{:.1f}%'.format).str.replace('.', ',')
             
-            # 2. Configurando a rosca e restringindo a área de desenho (domain)
             fig_p = go.Figure(go.Pie(
-                labels=df_rosca['Label_Legenda'], 
-                values=df_rosca['Patrimonio_Mercado_Ativo'], 
-                hole=0.55, 
-                textinfo='none',
-                domain=dict(x=[0, 0.60]), # A rosca ocupará apenas 60% do espaço à esquerda
+                labels=df_rosca_resumo['Label_Legenda'], 
+                values=df_rosca_resumo['Patrimonio_Mercado_Ativo'], 
+                hole=0.55, textinfo='none', domain=dict(x=[0, 0.60]),
                 hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
             ))
             
-            # 3. Posicionando a legenda na área livre à direita
-            fig_p.update_layout(
-                margin=dict(l=0, r=0, t=10, b=10), 
-                height=260, 
-                paper_bgcolor='rgba(0,0,0,0)', 
-                showlegend=True, 
-                legend=dict(
-                    orientation="v", 
-                    yanchor="middle", 
-                    y=0.5, 
-                    xanchor="left", 
-                    x=0.62, # Posiciona a legenda no corredor criado pelo domain
-                    font=dict(size=10)
-                )
-            )
-            st.plotly_chart(fig_p, use_container_width=True)
+            # Trava Antidistorção
+            fig_p.update_layout(dragmode=False, margin=dict(l=0, r=0, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)', showlegend=True, legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.62, font=dict(size=10)))
+            st.plotly_chart(fig_p, use_container_width=True, config=MOBILE_CONFIG)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
 # ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
@@ -391,16 +381,10 @@ with aba_alocacao:
         df_analise['Seguimento'] = df_analise['Seguimento'].fillna('NÃO INFORMADO').astype(str).str.upper()
         df_analise['Gestora'] = df_analise['Gestora'].fillna('NÃO INFORMADO').astype(str).str.upper()
 
-        # 🎯 LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
-        # 📏 CÁLCULO EXATO DE SIMETRIA:
         ALTURA_PILARES = 440 
-        
-        # Ajuste cirúrgico final: Passado para 74 para resultar em exatos 183px por rosca
         OVERHEAD_STREAMLIT = 74 
-        
-        # O Python calcula: (440 - 74) / 2 = 183
         ALTURA_ROSCAS = (ALTURA_PILARES - OVERHEAD_STREAMLIT) / 2
         
         # ==============================================================================
@@ -416,13 +400,16 @@ with aba_alocacao:
                     orientation='h', marker_color='#1fbc74',
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
+                
+                # Trava Antidistorção
                 fig_bar_ativos.update_layout(
+                    dragmode=False,
                     margin=dict(l=55, r=10, t=10, b=10), height=ALTURA_PILARES,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
+                    xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", fixedrange=True),
+                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10), fixedrange=True)
                 )
-                st.plotly_chart(fig_bar_ativos, use_container_width=True)
+                st.plotly_chart(fig_bar_ativos, use_container_width=True, config=MOBILE_CONFIG)
 
         # ==============================================================================
         # COLUNA DO MEIO (40%): CLASSIFICAÇÃO SOBRE SEGUIMENTO
@@ -437,8 +424,10 @@ with aba_alocacao:
                     textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                     hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
-                fig_t.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
-                st.plotly_chart(fig_t, use_container_width=True)
+                
+                # Trava Antidistorção
+                fig_t.update_layout(dragmode=False, margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
+                st.plotly_chart(fig_t, use_container_width=True, config=MOBILE_CONFIG)
                 
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>3. Seguimento</h4>", unsafe_allow_html=True)
@@ -449,8 +438,10 @@ with aba_alocacao:
                     textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                     hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
-                fig_s.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
-                st.plotly_chart(fig_s, use_container_width=True)
+                
+                # Trava Antidistorção
+                fig_s.update_layout(dragmode=False, margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
+                st.plotly_chart(fig_s, use_container_width=True, config=MOBILE_CONFIG)
 
         # ==============================================================================
         # COLUNA DIREITA (30%): EXPOSIÇÃO POR GESTORA
@@ -465,13 +456,16 @@ with aba_alocacao:
                     orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
+                
+                # Trava Antidistorção
                 fig_bar_gest.update_layout(
+                    dragmode=False,
                     margin=dict(l=75, r=10, t=10, b=10), height=ALTURA_PILARES,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
+                    xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", fixedrange=True),
+                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10), fixedrange=True)
                 )
-                st.plotly_chart(fig_bar_gest, use_container_width=True)
+                st.plotly_chart(fig_bar_gest, use_container_width=True, config=MOBILE_CONFIG)
 
     else:
         st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
