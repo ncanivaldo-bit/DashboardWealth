@@ -394,8 +394,8 @@ with aba_alocacao:
         # 🎯 LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
-        # Variáveis de controle para garantir simetria perfeita
-        ALTURA_PILARES = 520
+        # 🎯 AJUSTE DE ALINHAMENTO: Pilares reduzidos para 440 para nivelar com a base do meio
+        ALTURA_PILARES = 440 
         ALTURA_ROSCAS = 200
         
         # ==============================================================================
