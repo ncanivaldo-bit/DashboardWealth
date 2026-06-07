@@ -394,9 +394,11 @@ with aba_alocacao:
         # 🎯 LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
-        # 🎯 AJUSTE DE ALINHAMENTO: Pilares reduzidos para 440 para nivelar com a base do meio
+        # 🎯 ALINHAMENTO DEFINITIVO: 
+        # Pilares mantidos em 440px e Roscas centrais reduzidas para 170px 
+        # para compensar as bordas extras e o gap entre os contêineres do meio.
         ALTURA_PILARES = 440 
-        ALTURA_ROSCAS = 200
+        ALTURA_ROSCAS = 170
         
         # ==============================================================================
         # COLUNA ESQUERDA (30%): EXPOSIÇÃO POR ATIVO
