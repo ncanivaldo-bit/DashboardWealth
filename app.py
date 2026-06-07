@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO DEFINITIVAMENTE O VÁCUO E ALINHANDO OS GRÁFICOS
+# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO DEFINITIVAMENTE O VÁCUO ENTRE AS ABAS E OS CONTEÚDOS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -41,11 +41,6 @@ st.markdown("""
             margin-top: -35px !important;
         }
         
-        /* 🎯 NOVO: Esmaga o vácuo vertical do Streamlit. Isso PUXA o gráfico da Gestora para colar nas roscas! */
-        [data-testid="column"] > div {
-            gap: 0.3rem !important;
-        }
-        
         /* 4. Cola o título "PREVPRIV" no topo absoluto do navegador */
         h1 { 
             margin-top: -25px !important; 
@@ -70,7 +65,7 @@ st.markdown("""
 st.title("PREVPRIV")
 
 # ==============================================================================
-# CONEXÃO DIRETA COM O GOOGLE DRIVE
+# CONEXÃO DIRETA COM O GOOGLE DRIVE (Com proteção de Retry)
 # ==============================================================================
 @st.cache_resource
 def get_drive_service():
@@ -250,7 +245,7 @@ if not df_custodia_atual.empty:
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# 📝 ABA 1: RESUMO (TOTALMENTE PRESERVADA)
+# 📝 ABA 1: RESUMO 
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -357,7 +352,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (COMPACTA PARA CABER NA TELA)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
@@ -374,7 +369,7 @@ with aba_alocacao:
         col_super_esq, col_super_dir = st.columns([4, 6])
         
         # ==============================================================================
-        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (ALTURA AJUSTADA PARA SIMETRIA)
+        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS
         # ==============================================================================
         with col_super_esq:
             with st.container(border=True):
@@ -386,13 +381,13 @@ with aba_alocacao:
                     orientation='h', marker_color='#1fbc74',
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE DA SIMETRIA: A altura aqui foi aumentada de 420 para 495px para o fundo deste bloco alinhar perfeitamente com a caixinha de insights da direita.
-                # Se ainda precisar de um ajuste milimétrico para o seu monitor, você pode alterar esse número '495' para '490' ou '500'.
+                
+                # 🎯 REDUZIDO PARA 475 E FONTE PARA 10PX PARA ALINHAR COM O GRÁFICO DA GESTORA
                 fig_bar_ativos.update_layout(
-                    margin=dict(l=65, r=15, t=10, b=10), height=495,
+                    margin=dict(l=65, r=15, t=10, b=10), height=475,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=9))
+                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
                 )
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
@@ -414,7 +409,7 @@ with aba_alocacao:
                         hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
                     fig_t.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                        margin=dict(l=5, r=5, t=5, b=0), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_t, use_container_width=True)
                     
@@ -429,13 +424,13 @@ with aba_alocacao:
                         hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
                     fig_s.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                        margin=dict(l=5, r=5, t=5, b=0), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # ==============================================================================
-            # 🏢 🎯 GRÁFICO DA GESTORA ESTICADO INTERNAMENTE PARA CIMA E COMPACTADO
-            # ==============================================================================
+            # 🎯 PUXANDO O GRÁFICO DA GESTORA PARA CIMA COM -32px
+            st.markdown('<div style="margin-top: -32px;">', unsafe_allow_html=True)
+
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
                 df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
@@ -446,12 +441,13 @@ with aba_alocacao:
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
                 fig_bar_gest.update_layout(
-                    margin=dict(l=75, r=15, t=0, b=5), height=210,
+                    margin=dict(l=75, r=15, t=10, b=10), height=310,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
+                    yaxis=dict(type='category')
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Insights na base da aba
         st.markdown("""
