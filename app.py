@@ -351,12 +351,20 @@ with aba_resumo:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             df_rosca = df_custodia_atual.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False).copy()
-            # Ajuste na legenda para evitar sobreposição e reduzir barra de rolagem
             fig_p = go.Figure(go.Pie(labels=df_rosca['Ticker'], values=df_rosca['Patrimonio_Mercado_Ativo'], hole=0.55, textinfo='none'))
             fig_p.update_layout(
                 margin=dict(l=0, r=0, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)',
                 showlegend=True,
-                legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.9, font=dict(size=10))
+                legend=dict(
+                    orientation="v",
+                    yanchor="top",
+                    y=0.95,
+                    xanchor="left",
+                    x=1,
+                    font=dict(size=10),
+                    traceorder="normal",
+                    itemclick="toggleothers"
+                )
             )
             st.plotly_chart(fig_p, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -378,9 +386,6 @@ with aba_alocacao:
 
         col_super_esq, col_super_dir = st.columns([4, 6])
         
-        # ==============================================================================
-        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (ALTURA REDUZIDA PARA 420px)
-        # ==============================================================================
         with col_super_esq:
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>1. Exposição por Ativo (Ranking Geral)</h4>", unsafe_allow_html=True)
@@ -391,7 +396,6 @@ with aba_alocacao:
                     orientation='h', marker_color='#1fbc74',
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida de 540 para 420px. Fonte dos nomes reduzida para 9px para caber todos.
                 fig_bar_ativos.update_layout(
                     margin=dict(l=65, r=15, t=10, b=10), height=420,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
@@ -400,11 +404,7 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
-        # ==============================================================================
-        # COLUNA DA DIREITA (60%): CLASSIFICAÇÃO E SEGUIMENTO ALINHADOS
-        # ==============================================================================
         with col_super_dir:
-            
             col_interna_class, col_interna_seg = st.columns(2)
             
             with col_interna_class:
@@ -417,7 +417,6 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px para acompanhar a simetria com a esquerda
                     fig_t.update_layout(
                         margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
@@ -433,15 +432,11 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px
                     fig_s.update_layout(
                         margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # ==============================================================================
-            # 🏢 🎯 GRÁFICO DA GESTORA ESTICADO INTERNAMENTE PARA CIMA E COMPACTADO
-            # ==============================================================================
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
                 df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
@@ -451,7 +446,6 @@ with aba_alocacao:
                     orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida para 210px. t=0 e b=5 sobem o gráfico por dentro.
                 fig_bar_gest.update_layout(
                     margin=dict(l=75, r=15, t=0, b=5), height=210,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
@@ -460,7 +454,6 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
 
-        # Insights na base da aba
         st.markdown("""
             <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
                 <strong style="color: #2C3E50; font-size: 13px;">💡 Análise de Risco Macroestrutural:</strong>
@@ -471,3 +464,4 @@ with aba_alocacao:
         """, unsafe_allow_html=True)
     else:
         st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
+
