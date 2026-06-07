@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO DEFINITIVAMENTE O VÁCUO E ALINHANDO OS GRÁFICOS
+# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO DEFINITIVAMENTE O VÁCUO ENTRE AS ABAS E OS CONTEÚDOS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -41,11 +41,6 @@ st.markdown("""
             margin-top: -35px !important;
         }
         
-        /* 🎯 NOVO: Esmaga o vácuo vertical do Streamlit. Isso PUXA o gráfico da Gestora para colar nas roscas! */
-        [data-testid="column"] > div {
-            gap: 0.3rem !important;
-        }
-        
         /* 4. Cola o título "PREVPRIV" no topo absoluto do navegador */
         h1 { 
             margin-top: -25px !important; 
@@ -70,7 +65,7 @@ st.markdown("""
 st.title("PREVPRIV")
 
 # ==============================================================================
-# CONEXÃO DIRETA COM O GOOGLE DRIVE
+# CONEXÃO DIRETA COM O GOOGLE DRIVE (Com proteção de Retry)
 # ==============================================================================
 @st.cache_resource
 def get_drive_service():
@@ -357,7 +352,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (COMPACTA PARA CABER NA TELA)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (ESTRATÉGIA DE EXPANSÃO INTERNA CORES E MARGENS)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
@@ -374,7 +369,7 @@ with aba_alocacao:
         col_super_esq, col_super_dir = st.columns([4, 6])
         
         # ==============================================================================
-        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (ALTURA REDUZIDA PARA 420px)
+        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (height=540px)
         # ==============================================================================
         with col_super_esq:
             with st.container(border=True):
@@ -386,12 +381,11 @@ with aba_alocacao:
                     orientation='h', marker_color='#1fbc74',
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida de 540 para 420px. Fonte dos nomes reduzida para 9px para caber todos.
                 fig_bar_ativos.update_layout(
-                    margin=dict(l=65, r=15, t=10, b=10), height=420,
+                    margin=dict(l=65, r=15, t=10, b=10), height=540,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=9))
+                    yaxis=dict(type='category', dtick=1)
                 )
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
@@ -412,9 +406,9 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px para acompanhar a simetria com a esquerda
+                    # Retiramos qualquer margem excessiva da base do gráfico de pizza (b=0)
                     fig_t.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                        margin=dict(l=5, r=5, t=5, b=0), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_t, use_container_width=True)
                     
@@ -428,14 +422,17 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px
+                    # Retiramos qualquer margem excessiva da base do gráfico de pizza (b=0)
                     fig_s.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                        margin=dict(l=5, r=5, t=5, b=0), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
+            # Mantemos o recuo mecânico estável
+            st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
+
             # ==============================================================================
-            # 🏢 🎯 GRÁFICO DA GESTORA ESTICADO INTERNAMENTE PARA CIMA E COMPACTADO
+            # 🏢 🎯 GRÁFICO DA GESTORA ESTICADO INTERNAMENTE PARA CIMA (t=0, b=5)
             # ==============================================================================
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
@@ -446,14 +443,16 @@ with aba_alocacao:
                     orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida para 210px. t=0 e b=5 sobem o gráfico por dentro.
+                # 🎯 SOLUÇÃO DEFINITIVA: t=0 (esticou o gráfico para cima) e b=5 (diminuiu o espaço embaixo)
+                # Altura total elevada para 330px para trancar o alinhamento reto com o lado esquerdo
                 fig_bar_gest.update_layout(
-                    margin=dict(l=75, r=15, t=0, b=5), height=210,
+                    margin=dict(l=75, r=15, t=0, b=5), height=330,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
+                    yaxis=dict(type='category')
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Insights na base da aba
         st.markdown("""
