@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st
 import pandas as pd
 import numpy as np
 import json
@@ -35,7 +35,7 @@ st.markdown("""
             margin-bottom: 0px !important;
         }
         
-        /* 🎯 NOVO: Zera o espaço invisível que o Streamlit cria embaixo da linha das abas */
+        /* 🎯 Zera o espaço invisível que o Streamlit cria embaixo da linha das abas globalmente */
         [data-testid="stTabPanel"] {
             padding-top: 0rem !important;
             margin-top: -20px !important;
@@ -245,9 +245,12 @@ if not df_custodia_atual.empty:
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# ABA 1: RESUMO (TOTALMENTE PRESERVADA)
+# 📝 ABA 1: RESUMO (AJUSTADA: AGORA SOBE COLADA NA LINHA DAS ABAS EM 7PX)
 # ------------------------------------------------------------------------------
 with aba_resumo:
+    # 🎯 NOVO: Puxa o bloco de KPIs e gráficos para cima na aba Resumo
+    st.markdown("<div style='margin-top: -18px;'></div>", unsafe_allow_html=True)
+
     def formatar_br(v):
         prefixo = "-" if v < 0 else ""
         return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -261,7 +264,6 @@ with aba_resumo:
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
     color_rent = "#2E8B57" if rentabilidade_total_pct >= 0 else "#CD5C5C"
     
-    st.markdown('<div style="margin-top: -10px;">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -327,8 +329,8 @@ with aba_resumo:
                 </div>
             </div>
         """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
+    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
     st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
@@ -354,10 +356,10 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (COM OS GRÁFICOS COLADOS EM 7PX DE VERDADE)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
 # ------------------------------------------------------------------------------
 with aba_alocacao:
-    # 🎯 O CSS global injetado lá no topo agora assume o controle e mata o vácuo cinza nativo.
+    st.markdown("<div style='margin-top: -18px;'></div>", unsafe_allow_html=True)
     
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
@@ -383,82 +385,4 @@ with aba_alocacao:
                 fig_bar_ativos = go.Figure(go.Bar(
                     x=df_ativos_sorted['Patrimonio_Mercado_Ativo'], y=df_ativos_sorted['Ticker'],
                     orientation='h', marker_color='#1fbc74',
-                    hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
-                ))
-                fig_bar_ativos.update_layout(
-                    margin=dict(l=65, r=15, t=10, b=10), height=540,
-                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1)
-                )
-                st.plotly_chart(fig_bar_ativos, use_container_width=True)
-
-        # ==============================================================================
-        # COLUNA DA DIREITA (60%): CLASSIFICAÇÃO E SEGUIMENTO ALINHADOS
-        # ==============================================================================
-        with col_super_dir:
-            
-            col_interna_class, col_interna_seg = st.columns(2)
-            
-            with col_interna_class:
-                with st.container(border=True):
-                    st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>2. Classificação</h4>", unsafe_allow_html=True)
-                    df_g_tipo = df_analise.groupby('Classificacao')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
-                    
-                    fig_t = go.Figure(go.Pie(
-                        labels=df_g_tipo['Classificacao'], values=df_g_tipo['Patrimonio_Mercado_Ativo'], hole=0.55,
-                        textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
-                        hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
-                    ))
-                    fig_t.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
-                    )
-                    st.plotly_chart(fig_t, use_container_width=True)
-                    
-            with col_interna_seg:
-                with st.container(border=True):
-                    st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>3. Seguimento</h4>", unsafe_allow_html=True)
-                    df_g_seg = df_analise.groupby('Seguimento')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
-                    
-                    fig_s = go.Figure(go.Pie(
-                        labels=df_g_seg['Seguimento'], values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
-                        textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
-                        hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
-                    ))
-                    fig_s.update_layout(
-                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
-                    )
-                    st.plotly_chart(fig_s, use_container_width=True)
-
-            # Recuo inverso controlado para colar a base inferior
-            st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
-
-            # LINHA INFERIOR DIREITA: Exposição por Gestora (height=310px)
-            with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
-                df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
-                
-                fig_bar_gest = go.Figure(go.Bar(
-                    x=df_g_gest['Patrimonio_Mercado_Ativo'], y=df_g_gest['Gestora'],
-                    orientation='h', marker_color='#118DFF',
-                    hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
-                ))
-                fig_bar_gest.update_layout(
-                    margin=dict(l=75, r=15, t=10, b=10), height=310,
-                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category')
-                )
-                st.plotly_chart(fig_bar_gest, use_container_width=True)
-
-        # Insights na base da aba
-        st.markdown("""
-            <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
-                <strong style="color: #2C3E50; font-size: 13px;">💡 Análise de Risco Macroestrutural:</strong>
-                <span style="color: #5D6D7E; font-size: 12.5px;"> 
-                    Utilize o emparelhamento lateral entre <b>Classificação</b> e <b>Seguimento</b> para cruzar os dados de portefólio. Essa disposição lado a lado permite avaliar instantaneamente se a sua exposição setorial está em harmonia com a natureza dos ativos (Papel vs Tijolo).
-                </span>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
+                    hovertemplate='<b>Ativo:</b> %{y}<br>
