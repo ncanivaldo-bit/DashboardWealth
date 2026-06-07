@@ -238,7 +238,7 @@ if not df_custodia_atual.empty:
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# ABA 1: RESUMO (MANTIDA TOTALMENTE INTACTA COM SEU GRÁFICO DE LINHAS)
+# ABA 1: RESUMO (TOTALMENTE PRESERVADA COM O SEU GRÁFICO DE LINHAS)
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -348,7 +348,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO REESTRUTURADA (RACIOCÍNIO DE RISCO SOLICITADO)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO REESTRUTURADA (GRID ASIMÉTRICO INTELIGENTE)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
@@ -356,7 +356,7 @@ with aba_alocacao:
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
         
-        # Blindagem preventiva das colunas do Drive
+        # Mapeamento seguro das colunas do Drive
         if 'Classificacao' not in df_analise.columns: df_analise['Classificacao'] = 'NÃO INFORMADO'
         if 'Seguimento' not in df_analise.columns: df_analise['Seguimento'] = 'NÃO INFORMADO'
         if 'Gestora' not in df_analise.columns: df_analise['Gestora'] = 'NÃO INFORMADO'
@@ -365,18 +365,19 @@ with aba_alocacao:
         df_analise['Seguimento'] = df_analise['Seguimento'].fillna('NÃO INFORMADO').astype(str).str.upper()
         df_analise['Gestora'] = df_analise['Gestora'].fillna('NÃO INFORMADO').astype(str).str.upper()
 
-        # ==============================================================================
-        # LINHA 1: EXPOSIÇÃO POR ATIVO (B. HORIZONTAIS) vs CLASSIFICAÇÃO (ROSCA INTERNA)
-        # ==============================================================================
-        st.markdown('<div style="margin-top: 0px;">', unsafe_allow_html=True)
-        col_L1_esq, col_L1_dir = st.columns([6, 4])
+        # 📐 DIVISÃO DO GRID PRINCIPAL: 6 partes na Esquerda (Ativos) e 4 partes na Direita (Gráficos Compactados)
+        col_super_esq, col_super_dir = st.columns([6, 4])
         
-        with col_L1_esq:
+        # ==============================================================================
+        # COLUNA DA ESQUERDA: SUPER RANKING DE ATIVOS (Dobra de altura para respiro)
+        # ==============================================================================
+        with col_super_esq:
             with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>1. Exposição por Ativo (Ranking)</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>1. Exposição por Ativo (Ranking Geral)</h4>", unsafe_allow_html=True)
                 
-                df_ativos_sorted = df_analise.sort_values(by='Patrimonio_Mercado_Ativo', ascending=True) # Ascending True para o Plotly renderizar maior no topo
+                df_ativos_sorted = df_analise.sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
                 
+                # 🎯 ALTURA EXPANDIDA PARA 540PX (Dobra o tamanho para comportar todos os tickers com folga)
                 fig_bar_ativos = go.Figure(go.Bar(
                     x=df_ativos_sorted['Patrimonio_Mercado_Ativo'],
                     y=df_ativos_sorted['Ticker'],
@@ -385,43 +386,36 @@ with aba_alocacao:
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
                 fig_bar_ativos.update_layout(
-                    margin=dict(l=60, r=15, t=10, b=10), height=260,
+                    margin=dict(l=65, r=15, t=10, b=10), height=540,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category')
+                    yaxis=dict(type='category', dtick=1) # Força a amostragem limpa de cada linha
                 )
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
-                
-        with col_L1_dir:
+
+        # ==============================================================================
+        # COLUNA DA DIREITA: TRÊS GRÁFICOS COMPACTADOS E EMPILHADOS (EFEITO COCKPIT)
+        # ==============================================================================
+        with col_super_dir:
+            
+            # --- 2. CLASSIFICAÇÃO (TOPO) ---
             with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>2. Alocação por Classificação</h4>", unsafe_allow_html=True)
-                
+                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>2. Alocação por Classificação</h4>", unsafe_allow_html=True)
                 df_g_tipo = df_analise.groupby('Classificacao')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
                 
-                # 🎯 AJUSTADO: Informações injetadas diretamente dentro da fatia, removendo a legenda externa
                 fig_t = go.Figure(go.Pie(
                     labels=df_g_tipo['Classificacao'], values=df_g_tipo['Patrimonio_Mercado_Ativo'], hole=0.55,
                     textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                     hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
                 fig_t.update_layout(
-                    margin=dict(l=10, r=10, t=15, b=15), height=260, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                    margin=dict(l=10, r=10, t=5, b=5), height=160, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                 )
                 st.plotly_chart(fig_t, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # 🎯 Espaçador controlado inverso para colar a Linha 2 de baixo para cima
-        st.markdown('<div style="margin-top: -14px;">', unsafe_allow_html=True)
-        
-        # ==============================================================================
-        # LINHA 2: SEGUIMENTO (ROSCA TRADICIONAL) vs EXPOSIÇÃO POR GESTORA (B. HORIZONTAIS)
-        # ==============================================================================
-        col_L2_esq, col_L2_dir = st.columns([5, 5])
-        
-        with col_L2_esq:
+            
+            # --- 3. SEGUIMENTO (MEIO - SUBIU CONFORME SOLICITADO) ---
             with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>3. Alocação por Seguimento</h4>", unsafe_allow_html=True)
-                
+                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>3. Alocação por Seguimento</h4>", unsafe_allow_html=True)
                 df_g_seg = df_analise.groupby('Seguimento')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
                 total_seg = df_g_seg['Patrimonio_Mercado_Ativo'].sum()
                 labels_seg = [f"<b>{r['Seguimento']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_seg)*100:.1f}%)" for _, r in df_g_seg.iterrows()]
@@ -431,42 +425,37 @@ with aba_alocacao:
                     textinfo='none', hovertemplate='<b>Setor:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
                 fig_s.update_layout(
-                    margin=dict(l=5, r=5, t=10, b=10), height=260, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
-                    legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.0, font=dict(size=9.5))
+                    margin=dict(l=5, r=5, t=5, b=5), height=160, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
+                    legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.0, font=dict(size=9))
                 )
                 st.plotly_chart(fig_s, use_container_width=True)
-                
-        with col_L2_dir:
+
+            # --- 4. EXPOSIÇÃO POR GESTORA (BASE) ---
             with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora (Ranking)</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
+                df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
                 
-                df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True) # Ascending True para o maior ficar no topo
-                
-                # 🎯 AJUSTADO: Exposição por gestora em formato de barras horizontais classificado do maior para o menor
                 fig_bar_gest = go.Figure(go.Bar(
-                    x=df_g_gest['Patrimonio_Mercado_Ativo'],
-                    y=df_g_gest['Gestora'],
-                    orientation='h',
-                    marker_color='#118DFF',
+                    x=df_g_gest['Patrimonio_Mercado_Ativo'], y=df_g_gest['Gestora'],
+                    orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
                 fig_bar_gest.update_layout(
-                    margin=dict(l=80, r=15, t=10, b=10), height=260,
+                    margin=dict(l=75, r=15, t=5, b=5), height=160,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
                     yaxis=dict(type='category')
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
-        # Insights na base da aba
+        # Insights na base da aba para fechar o visual com elegância
         st.markdown("""
-            <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: -10px;">
-                <strong style="color: #2C3E50; font-size: 13px;">💡 Análise Macrost Estrutural:</strong>
+            <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
+                <strong style="color: #2C3E50; font-size: 13px;">💡 Análise de Risco Operacional:</strong>
                 <span style="color: #5D6D7E; font-size: 12.5px;"> 
-                    Utilize os rankings de <b>Ativos</b> e <b>Gestoras</b> para garantir que nenhuma tese ou equipe de gestão isolada controle mais do que o seu teto prudencial. Caso note alguma barra excessivamente longa nas horizontais, utilize os próximos aportes para expandir as fatias menores de <b>Classificação</b> e <b>Seguimento</b>.
+                    Com a expansão do ranking de <b>Ativos</b> na esquerda, você pode monitorar de ponta a ponta a calda longa da sua carteira. Use a trinca da direita (<b>Classificação</b> ➔ <b>Seguimento</b> ➔ <b>Gestora</b>) de forma combinada para barrar alocações cruzadas indesejadas na consolidação macro.
                 </span>
             </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("ℹ nighttime: Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
+        st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
