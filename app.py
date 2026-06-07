@@ -245,7 +245,7 @@ if not df_custodia_atual.empty:
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# 📝 ABA 1: RESUMO (TRAVADA PELO CSS GLOBAL - COLADA NO TOPO EM 7PX)
+# 📝 ABA 1: RESUMO
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -327,7 +327,6 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
     st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
@@ -353,7 +352,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (TRAVADA PELO CSS GLOBAL - COLADA NO TOPO EM 7PX)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (6PX ENTRE LINHA SUPERIOR E INFERIOR)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
@@ -427,7 +426,8 @@ with aba_alocacao:
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
+            # 🎯 AJUSTADO: A margem negativa foi para -22px para calibrar a distância exata de 6px visíveis!
+            st.markdown('<div style="margin-top: -22px;">', unsafe_allow_html=True)
 
             # LINHA INFERIOR DIREITA: Exposição por Gestora (height=310px)
             with st.container(border=True):
