@@ -10,17 +10,14 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # ==============================================================================
-# CONFIGURAÇÃO DE TELA E IDENTIDADE VISUAL
+# 1. CONFIGURAÇÃO DE TELA E IDENTIDADE VISUAL
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO DEFINITIVAMENTE O VÁCUO E ALINHANDO OS GRÁFICOS
+# 🎯 INJEÇÃO CSS COMPLETA
 st.markdown("""
     <style>
-        /* 1. Remove a barra de cabeçalho transparente nativa */
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
-        
-        /* 2. Zera o recuo superior e força o preenchimento total da largura da tela */
         [data-testid="stMainBlockContainer"] {
             padding-top: 0.8rem !important;
             padding-bottom: 0.8rem !important;
@@ -28,49 +25,36 @@ st.markdown("""
             padding-right: 1rem !important;
             max-width: 100% !important;
         }
-        
-        /* 3. Puxa a linha das abas para cima, colando no título PREVPRIV */
         [data-testid="stTabs"] {
             margin-top: -25px !important;
             margin-bottom: 0px !important;
         }
-        
-        /* 🎯 TRAVA GLOBAL: Zera o espaço invisível e força TODO o conteúdo de AMBAS as abas a SUBIR colado na linha em 7px */
         [data-testid="stTabPanel"] {
             padding-top: 0rem !important;
             margin-top: -35px !important;
         }
-        
-        /* 🎯 NOVO: Esmaga o vácuo vertical do Streamlit. Isso PUXA o gráfico da Gestora para colar nas roscas! */
         [data-testid="column"] > div {
             gap: 0.3rem !important;
         }
-        
-        /* 4. Cola o título "PREVPRIV" no topo absoluto do navegador */
         h1 { 
             margin-top: -25px !important; 
             margin-bottom: 5px !important; 
             font-size: 26px !important; 
             font-weight: 700 !important;
         }
-        
-        /* 5. Oculta os menus e botões da plataforma */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
-        
-        /* 6. Esconde o ícone do GitHub no canto superior direito */
         .viewerBadge_link__1S137 { display: none !important; }
         a.viewerBadge_link__1S137 { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# Título direto no topo
 st.title("PREVPRIV")
 
 # ==============================================================================
-# CONEXÃO DIRETA COM O GOOGLE DRIVE
+# 2. CONEXÃO DIRETA COM O GOOGLE DRIVE
 # ==============================================================================
 @st.cache_resource
 def get_drive_service():
@@ -101,42 +85,10 @@ def download_excel_from_drive(file_id, sheet_name=0):
             time.sleep(1)
 
 # ==============================================================================
-# MOTOR MATRICIAL - PROCESSAMENTO DOS DADOS CACHEADO
+# 3. MOTOR DE RACIOCÍNIO - MÓDULOS DE TRANSFORMAÇÃO (ETL)
 # ==============================================================================
-@st.cache_data(ttl=600)
-def carregar_e_processar_dados_carteira():
-    ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
-    
-    df_mov = download_excel_from_drive(ID_UNIFICADO, sheet_name='Movimentacao')
-    df_inf = download_excel_from_drive(ID_UNIFICADO, sheet_name='Inf_Ativos')
-    df_precos_historicos = download_excel_from_drive(ID_UNIFICADO, sheet_name='Hist_Precos')
-    
-    df_mov.columns = df_mov.columns.astype(str).str.strip()
-    df_inf.columns = df_inf.columns.astype(str).str.strip()
-    df_precos_historicos.columns = df_precos_historicos.columns.astype(str).str.strip()
-    
-    df_mov['Ticker'] = df_mov['Ticker'].astype(str).str.strip()
-    df_inf['Ticker'] = df_inf['Ticker'].astype(str).str.strip()
-    df_precos_historicos['Ticker'] = df_precos_historicos['Ticker'].astype(str).str.strip()
-    
-    conversao_tickers = {"MALL11": "PMLL11", "CVBI11": "PCIP11"}
-    df_mov['Ticker'] = df_mov['Ticker'].replace(conversao_tickers)
-    df_inf['Ticker'] = df_inf['Ticker'].replace(conversao_tickers)
-    df_precos_historicos['Ticker'] = df_precos_historicos['Ticker'].replace(conversao_tickers)
-    
-    df_mov['Quantidade_Num'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
-    df_mov['Valor_Operacao_Num'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
-    df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%Y-%m-%d', errors='coerce')
-    if df_mov['Data_Datetime'].isna().all():
-        df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
-
-    df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
-    df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
-    df_precos_historicos['Chave_Merge'] = df_precos_historicos['Chave_Merge'].astype(str).str.strip()
-
-    eventos_custodia = ['Compra', 'Venda', 'Desdobro']
-    df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
-    
+def calcular_historico_posicoes(df_trades):
+    """Processa iterativamente o histórico para encontrar o preço médio exato."""
     carteira = {}
     historico_detalhado = []
     
@@ -171,28 +123,75 @@ def carregar_e_processar_dados_carteira():
             carteira[ticker]['custo_total'] = 0.0
             carteira[ticker]['preco_medio'] = 0.0
             
-        for tk, dados in carteira.items():
-            historico_detalhado.append({
-                'Data': data,
-                'Ticker': tk,
-                'Quantidade': dados['quantidade'],
-                'Custo_Total': dados['custo_total']
-            })
-            
+        historico_detalhado.append({
+            'Data': data,
+            'Ticker': ticker,
+            'Quantidade': carteira[ticker]['quantidade'],
+            'Custo_Total': carteira[ticker]['custo_total']
+        })
+        
+    return pd.DataFrame(historico_detalhado)
+
+def extrair_kpis_proventos(df_mov):
+    """Filtra e totaliza os proventos recebidos."""
     termos_proventos = ['Dividendo', 'JCP', 'Rendimento', 'Provento']
     df_proventos = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
-    total_dividendos_historico = float(df_proventos['Valor da Operação'].sum())
     
+    total_dividendos_historico = float(df_proventos['Valor_Operacao_Num'].sum()) if not df_proventos.empty else 0.0
     ultimo_provento_valor = 0.0
     ultimo_provento_mes_ano = "-"
+    
     if not df_proventos.empty and not df_proventos['Data_Datetime'].isna().all():
         df_proventos['AnoMes'] = df_proventos['Data_Datetime'].dt.to_period('M')
-        proventos_por_mes = df_proventos.groupby('AnoMes')['Valor da Operação'].sum().sort_index()
+        proventos_por_mes = df_proventos.groupby('AnoMes')['Valor_Operacao_Num'].sum().sort_index()
         if not proventos_por_mes.empty:
             ultimo_provento_valor = float(proventos_por_mes.iloc[-1])
             ultimo_provento_mes_ano = proventos_por_mes.index[-1].strftime('%m/%Y')
+            
+    return total_dividendos_historico, ultimo_provento_valor, ultimo_provento_mes_ano
 
-    df_hist_ativos = pd.DataFrame(historico_detalhado)
+# ==============================================================================
+# 4. ORQUESTRAÇÃO DE DADOS (CACHEADA)
+# ==============================================================================
+@st.cache_data(ttl=600, show_spinner=False)
+def orquestrar_pipeline_carteira():
+    ID_UNIFICADO = '1d4AMHX5El8JOEbgwpBVm513-ImJPFiGXrRG_2VoObTo'
+    
+    # 1. Extração
+    df_mov = download_excel_from_drive(ID_UNIFICADO, sheet_name='Movimentacao')
+    df_inf = download_excel_from_drive(ID_UNIFICADO, sheet_name='Inf_Ativos')
+    df_precos_historicos = download_excel_from_drive(ID_UNIFICADO, sheet_name='Hist_Precos')
+    
+    # 2. Limpeza Primária
+    for df in [df_mov, df_inf, df_precos_historicos]:
+        df.columns = df.columns.astype(str).str.strip()
+        if 'Ticker' in df.columns:
+            df['Ticker'] = df['Ticker'].astype(str).str.strip()
+
+    df_precos_historicos['Chave_Merge'] = df_precos_historicos['Chave_Merge'].astype(str).str.strip()
+    
+    conversao_tickers = {"MALL11": "PMLL11", "CVBI11": "PCIP11"}
+    df_mov['Ticker'] = df_mov['Ticker'].replace(conversao_tickers)
+    df_inf['Ticker'] = df_inf['Ticker'].replace(conversao_tickers)
+    df_precos_historicos['Ticker'] = df_precos_historicos['Ticker'].replace(conversao_tickers)
+    
+    df_mov['Quantidade_Num'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
+    df_mov['Valor_Operacao_Num'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
+    df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%Y-%m-%d', errors='coerce')
+    if df_mov['Data_Datetime'].isna().all():
+        df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
+
+    df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
+    df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
+
+    # 3. Transformação Customizada
+    eventos_custodia = ['Compra', 'Venda', 'Desdobro']
+    df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
+    
+    df_hist_ativos = calcular_historico_posicoes(df_trades)
+    total_dividendos, ult_provento_val, ult_provento_mes = extrair_kpis_proventos(df_mov)
+    
+    # 4. Fechamento Mensal e Consolidação
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
         df_mensal_ativos = (df_hist_ativos
@@ -206,26 +205,31 @@ def carregar_e_processar_dados_carteira():
         df_mensal_ativos.loc[df_mensal_ativos['Quantidade'] <= 0, 'Custo_Total'] = 0.0
         df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
         df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
-        df_mensal_ativos['Ano_Str'] = df_mensal_ativos['Data'].dt.strftime('%Y')
         
         df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
         df_consolidado = pd.merge(df_consolidado, df_inf, on='Ticker', how='left')
         
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
-        
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
         df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
         df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
         
-        return df_consolidado, df_custodia_atual, total_dividendos_historico, ultimo_provento_valor, ultimo_provento_mes_ano
+        return df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes
+        
     return pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
 
-# Execução do Motor de Raciocínio
-df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = carregar_e_processar_dados_carteira()
+# ==============================================================================
+# 5. EXECUÇÃO DA INTERFACE VISUAL
+# ==============================================================================
 
+# ⏳ Feedback Visual durante o carregamento dos dados
+with st.spinner('Sincronizando custódia com a nuvem...'):
+    df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = orquestrar_pipeline_carteira()
+
+# Cálculos de KPIs Gerais
 total_investido_kpi = 0.0
 patrimonio_mercado_kpi = 0.0
 ganho_capital_kpi = 0.0
@@ -244,13 +248,10 @@ if not df_custodia_atual.empty:
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
-# ==============================================================================
-# RENDERIZAÇÃO DA INTERFACE VISUAL
-# ==============================================================================
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# 📝 ABA 1: RESUMO (TOTALMENTE PRESERVADA)
+# 📝 ABA 1: RESUMO 
 # ------------------------------------------------------------------------------
 with aba_resumo:
     def formatar_br(v):
@@ -357,7 +358,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (COMPACTA PARA CABER NA TELA)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
@@ -373,9 +374,6 @@ with aba_alocacao:
 
         col_super_esq, col_super_dir = st.columns([4, 6])
         
-        # ==============================================================================
-        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS (ALTURA REDUZIDA PARA 420px)
-        # ==============================================================================
         with col_super_esq:
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>1. Exposição por Ativo (Ranking Geral)</h4>", unsafe_allow_html=True)
@@ -386,7 +384,6 @@ with aba_alocacao:
                     orientation='h', marker_color='#1fbc74',
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida de 540 para 420px. Fonte dos nomes reduzida para 9px para caber todos.
                 fig_bar_ativos.update_layout(
                     margin=dict(l=65, r=15, t=10, b=10), height=420,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
@@ -395,11 +392,7 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
-        # ==============================================================================
-        # COLUNA DA DIREITA (60%): CLASSIFICAÇÃO E SEGUIMENTO ALINHADOS
-        # ==============================================================================
         with col_super_dir:
-            
             col_interna_class, col_interna_seg = st.columns(2)
             
             with col_interna_class:
@@ -412,7 +405,6 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px para acompanhar a simetria com a esquerda
                     fig_t.update_layout(
                         margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
@@ -428,15 +420,11 @@ with aba_alocacao:
                         textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                         hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                     ))
-                    # 🎯 AJUSTE: Altura das roscas reduzida para 170px
                     fig_s.update_layout(
                         margin=dict(l=5, r=5, t=5, b=0), height=170, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-            # ==============================================================================
-            # 🏢 🎯 GRÁFICO DA GESTORA ESTICADO INTERNAMENTE PARA CIMA E COMPACTADO
-            # ==============================================================================
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
                 df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
@@ -446,7 +434,6 @@ with aba_alocacao:
                     orientation='h', marker_color='#118DFF',
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
-                # 🎯 AJUSTE: Altura reduzida para 210px. t=0 e b=5 sobem o gráfico por dentro.
                 fig_bar_gest.update_layout(
                     margin=dict(l=75, r=15, t=0, b=5), height=210,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
@@ -455,16 +442,13 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
 
-        # Insights na base da aba
         st.markdown("""
             <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
                 <strong style="color: #2C3E50; font-size: 13px;">💡 Análise de Risco Macroestrutural:</strong>
                 <span style="color: #5D6D7E; font-size: 12.5px;"> 
-                    Utilize o emparelhamento lateral entre <b>Classificação</b> e <b>Seguimento</b> para cruzar os dados de portefólio. Essa disposição lado a lado permite avaliar instantaneamente se a sua exposição setorial está em harmonia com a natureza dos ativos (Papel vs Tijolo).
+                    Utilize o emparelhamento lateral entre <b>Classificação</b> e <b>Seguimento</b> para cruzar os dados de portfólio. Essa disposição lado a lado permite avaliar instantaneamente se a sua exposição setorial está em harmonia com a natureza dos ativos (Papel vs Tijolo).
                 </span>
             </div>
         """, unsafe_allow_html=True)
     else:
         st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
-
-
