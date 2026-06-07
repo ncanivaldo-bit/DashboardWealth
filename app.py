@@ -395,13 +395,12 @@ with aba_alocacao:
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
         # 📏 CÁLCULO EXATO DE SIMETRIA:
-        # A altura dos pilares laterais dita a regra geral.
         ALTURA_PILARES = 440 
         
-        # O overhead soma o espaço ocupado por: 2 títulos h4, margens internas, bordas e o gap de 0.3rem
-        OVERHEAD_STREAMLIT = 80 
+        # Ajuste fino: Reduzido para 70 para que a divisão resulte em exatamente 185px por rosca
+        OVERHEAD_STREAMLIT = 70 
         
-        # O Python calcula automaticamente a altura das roscas garantindo o nivelamento
+        # O Python calcula: (440 - 70) / 2 = 185
         ALTURA_ROSCAS = (ALTURA_PILARES - OVERHEAD_STREAMLIT) / 2
         
         # ==============================================================================
