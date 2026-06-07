@@ -14,7 +14,7 @@ from googleapiclient.http import MediaIoBaseDownload
 # ==============================================================================
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
-# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO O VÁCUO NATIVO ENTRE AS ABAS E OS GRÁFICOS
+# 🎯 INJEÇÃO CSS COMPLETA: ZERANDO DEFINITIVAMENTE O VÁCUO ENTRE AS ABAS E OS CONTEÚDOS
 st.markdown("""
     <style>
         /* 1. Remove a barra de cabeçalho transparente nativa */
@@ -35,10 +35,10 @@ st.markdown("""
             margin-bottom: 0px !important;
         }
         
-        /* 🎯 Zera o espaço invisível que o Streamlit cria embaixo da linha das abas globalmente */
+        /* 🎯 TRAVA GLOBAL: Zera o espaço invisível e força TODO o conteúdo de AMBAS as abas a SUBIR colado na linha em 7px */
         [data-testid="stTabPanel"] {
             padding-top: 0rem !important;
-            margin-top: -20px !important;
+            margin-top: -35px !important;
         }
         
         /* 4. Cola o título "PREVPRIV" no topo absoluto do navegador */
@@ -245,11 +245,9 @@ if not df_custodia_atual.empty:
 aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 # ------------------------------------------------------------------------------
-# 📝 ABA 1: RESUMO
+# 📝 ABA 1: RESUMO (TRAVADA PELO CSS GLOBAL - COLADA NO TOPO EM 7PX)
 # ------------------------------------------------------------------------------
 with aba_resumo:
-    st.markdown("<div style='margin-top: -18px;'></div>", unsafe_allow_html=True)
-
     def formatar_br(v):
         prefixo = "-" if v < 0 else ""
         return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -329,6 +327,7 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
+    # Margem inversa puxa o bloco de gráficos para cima comprimindo o vão com os cartões
     st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
@@ -354,11 +353,9 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO (TRAVADA PELO CSS GLOBAL - COLADA NO TOPO EM 7PX)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
-    st.markdown("<div style='margin-top: -18px;'></div>", unsafe_allow_html=True)
-    
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
         
@@ -380,7 +377,6 @@ with aba_alocacao:
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:15px; font-weight:600; text-transform:uppercase;'>1. Exposição por Ativo (Ranking Geral)</h4>", unsafe_allow_html=True)
                 df_ativos_sorted = df_analise.sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
                 
-                # 🎯 CORRIGIDO: hovertemplate em linha única sem quebra de string para evitar SyntaxError
                 fig_bar_ativos = go.Figure(go.Bar(
                     x=df_ativos_sorted['Patrimonio_Mercado_Ativo'], y=df_ativos_sorted['Ticker'],
                     orientation='h', marker_color='#1fbc74',
