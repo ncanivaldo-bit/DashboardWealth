@@ -397,10 +397,10 @@ with aba_alocacao:
         # 📏 CÁLCULO EXATO DE SIMETRIA:
         ALTURA_PILARES = 440 
         
-        # Ajuste cirúrgico final: Passado para 76 para resultar em exatos 182px por rosca
-        OVERHEAD_STREAMLIT = 76 
+        # Ajuste cirúrgico final: Passado para 74 para resultar em exatos 183px por rosca
+        OVERHEAD_STREAMLIT = 74 
         
-        # O Python calcula: (440 - 76) / 2 = 182
+        # O Python calcula: (440 - 74) / 2 = 183
         ALTURA_ROSCAS = (ALTURA_PILARES - OVERHEAD_STREAMLIT) / 2
         
         # ==============================================================================
