@@ -348,7 +348,7 @@ with aba_resumo:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO REESTRUTURADA (GRID ASIMÉTRICO INTELIGENTE)
+# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO REESTRUTURADA (40% ATIVOS / 60% ANÁLISES)
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
@@ -365,11 +365,11 @@ with aba_alocacao:
         df_analise['Seguimento'] = df_analise['Seguimento'].fillna('NÃO INFORMADO').astype(str).str.upper()
         df_analise['Gestora'] = df_analise['Gestora'].fillna('NÃO INFORMADO').astype(str).str.upper()
 
-        # 📐 DIVISÃO DO GRID PRINCIPAL: 6 partes na Esquerda (Ativos) e 4 partes na Direita (Gráficos Compactados)
-        col_super_esq, col_super_dir = st.columns([6, 4])
+        # 📐 🎯 AJUSTADO: Proporção invertida! 4 colunas para o Bloco de Ativos e 6 colunas para Classificação/Seguimento/Gestora
+        col_super_esq, col_super_dir = st.columns([4, 6])
         
         # ==============================================================================
-        # COLUNA DA ESQUERDA: SUPER RANKING DE ATIVOS (Dobra de altura para respiro)
+        # COLUNA DA ESQUERDA (40%): RANKING DE ATIVOS ESGUIO E COMPACTO (height=540px)
         # ==============================================================================
         with col_super_esq:
             with st.container(border=True):
@@ -377,7 +377,6 @@ with aba_alocacao:
                 
                 df_ativos_sorted = df_analise.sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
                 
-                # 🎯 ALTURA EXPANDIDA PARA 540PX (Dobra o tamanho para comportar todos os tickers com folga)
                 fig_bar_ativos = go.Figure(go.Bar(
                     x=df_ativos_sorted['Patrimonio_Mercado_Ativo'],
                     y=df_ativos_sorted['Ticker'],
@@ -389,50 +388,57 @@ with aba_alocacao:
                     margin=dict(l=65, r=15, t=10, b=10), height=540,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1) # Força a amostragem limpa de cada linha
+                    yaxis=dict(type='category', dtick=1)
                 )
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
         # ==============================================================================
-        # COLUNA DA DIREITA: TRÊS GRÁFICOS COMPACTADOS E EMPILHADOS (EFEITO COCKPIT)
+        # COLUNA DA DIREITA (60%): CLASSIFICAÇÃO E SEGUIMENTO EXPANDIDOS LADO A LADO
         # ==============================================================================
         with col_super_dir:
             
-            # --- 2. CLASSIFICAÇÃO (TOPO) ---
-            with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>2. Alocação por Classificação</h4>", unsafe_allow_html=True)
-                df_g_tipo = df_analise.groupby('Classificacao')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
-                
-                fig_t = go.Figure(go.Pie(
-                    labels=df_g_tipo['Classificacao'], values=df_g_tipo['Patrimonio_Mercado_Ativo'], hole=0.55,
-                    textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
-                    hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
-                ))
-                fig_t.update_layout(
-                    margin=dict(l=10, r=10, t=5, b=5), height=160, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
-                )
-                st.plotly_chart(fig_t, use_container_width=True)
+            # LINHA SUPERIOR DIREITA: Divisão simétrica de Classificação e Seguimento com muito mais largura de tela
+            col_interna_class, col_interna_seg = st.columns(2)
             
-            # --- 3. SEGUIMENTO (MEIO - SUBIU CONFORME SOLICITADO) ---
-            with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>3. Alocação por Seguimento</h4>", unsafe_allow_html=True)
-                df_g_seg = df_analise.groupby('Seguimento')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
-                total_seg = df_g_seg['Patrimonio_Mercado_Ativo'].sum()
-                labels_seg = [f"<b>{r['Seguimento']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_seg)*100:.1f}%)" for _, r in df_g_seg.iterrows()]
-                
-                fig_s = go.Figure(go.Pie(
-                    labels=labels_seg, values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
-                    textinfo='none', hovertemplate='<b>Setor:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
-                ))
-                fig_s.update_layout(
-                    margin=dict(l=5, r=5, t=5, b=5), height=160, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
-                    legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.0, font=dict(size=9))
-                )
-                st.plotly_chart(fig_s, use_container_width=True)
+            with col_interna_class:
+                with st.container(border=True):
+                    st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>2. Classificação</h4>", unsafe_allow_html=True)
+                    df_g_tipo = df_analise.groupby('Classificacao')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
+                    
+                    fig_t = go.Figure(go.Pie(
+                        labels=df_g_tipo['Classificacao'], values=df_g_tipo['Patrimonio_Mercado_Ativo'], hole=0.55,
+                        textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
+                        hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
+                    ))
+                    fig_t.update_layout(
+                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=False
+                    )
+                    st.plotly_chart(fig_t, use_container_width=True)
+                    
+            with col_interna_seg:
+                with st.container(border=True):
+                    st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>3. Seguimento</h4>", unsafe_allow_html=True)
+                    df_g_seg = df_analise.groupby('Seguimento')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
+                    total_seg = df_g_seg['Patrimonio_Mercado_Ativo'].sum()
+                    labels_seg = [f"<b>{r['Seguimento']}</b> ({(r['Patrimonio_Mercado_Ativo']/total_seg)*100:.1f}%)" for _, r in df_g_seg.iterrows()]
+                    
+                    # 🎯 GANHOU ESPAÇO: Com 60% na direita, as fatias de Seguimento respiram livremente e a legenda lateral encaixa sem aperto
+                    fig_s = go.Figure(go.Pie(
+                        labels=labels_seg, values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
+                        textinfo='none', hovertemplate='<b>Setor:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
+                    ))
+                    fig_s.update_layout(
+                        margin=dict(l=5, r=5, t=5, b=5), height=200, paper_bgcolor='rgba(0,0,0,0)', showlegend=True,
+                        legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=0.0, font=dict(size=8.5))
+                    )
+                    st.plotly_chart(fig_s, use_container_width=True)
 
-            # --- 4. EXPOSIÇÃO POR GESTORA (BASE) ---
+            # Recuo inverso para grudar os rankings na base de forma milimétrica
+            st.markdown('<div style="margin-top: -12px;">', unsafe_allow_html=True)
+
+            # LINHA INFERIOR DIREITA: Exposição por Gestora (Ocupa os 60% da base inferior direita com 310px de altura)
             with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
                 df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
                 
                 fig_bar_gest = go.Figure(go.Bar(
@@ -441,19 +447,19 @@ with aba_alocacao:
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
                 fig_bar_gest.update_layout(
-                    margin=dict(l=75, r=15, t=5, b=5), height=160,
+                    margin=dict(l=75, r=15, t=10, b=10), height=310,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
                     yaxis=dict(type='category')
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True)
 
-        # Insights na base da aba para fechar o visual com elegância
+        # Insights na base da aba
         st.markdown("""
             <div style="border: 1px solid #D6DBDF; border-radius: 6px; padding: 10px; background-color: #EBEDEF; margin-top: 5px;">
-                <strong style="color: #2C3E50; font-size: 13px;">💡 Análise de Risco Operacional:</strong>
+                <strong style="color: #2C3E50; font-size: 13px;">💡 Análise de Risco Macroestrutural:</strong>
                 <span style="color: #5D6D7E; font-size: 12.5px;"> 
-                    Com a expansão do ranking de <b>Ativos</b> na esquerda, você pode monitorar de ponta a ponta a calda longa da sua carteira. Use a trinca da direita (<b>Classificação</b> ➔ <b>Seguimento</b> ➔ <b>Gestora</b>) de forma combinada para barrar alocações cruzadas indesejadas na consolidação macro.
+                    Utilize o emparelhamento lateral entre <b>Classificação</b> e <b>Seguimento</b> para cruzar os dados de portefólio. Essa disposição lado a lado permite avaliar instantaneamente se a sua exposição setorial está em harmonia com a natureza dos ativos (Papel vs Tijolo).
                 </span>
             </div>
         """, unsafe_allow_html=True)
