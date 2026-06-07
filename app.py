@@ -394,14 +394,14 @@ with aba_alocacao:
         # 🎯 LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
-        # 🎯 ALINHAMENTO DEFINITIVO: 
-        # Pilares mantidos em 440px e Roscas centrais reduzidas para 170px 
-        # para compensar as bordas extras e o gap entre os contêineres do meio.
+        # 🎯 ALINHAMENTO FINO COM BASE NA IMAGEM: 
+        # Laterais intocadas (440). 
+        # Meio ajustado para 190 (o ponto de equilíbrio entre faltar e sobrar espaço).
         ALTURA_PILARES = 440 
-        ALTURA_ROSCAS = 170
+        ALTURA_ROSCAS = 190
         
         # ==============================================================================
-        # COLUNA ESQUERDA (30%): EXPOSIÇÃO POR ATIVO
+        # COLUNA ESQUERDA (30%): EXPOSIÇÃO POR ATIVO (INTOCADA)
         # ==============================================================================
         with col_esq:
             with st.container(border=True):
@@ -422,7 +422,7 @@ with aba_alocacao:
                 st.plotly_chart(fig_bar_ativos, use_container_width=True)
 
         # ==============================================================================
-        # COLUNA DO MEIO (40%): CLASSIFICAÇÃO SOBRE SEGUIMENTO
+        # COLUNA DO MEIO (40%): CLASSIFICAÇÃO SOBRE SEGUIMENTO (AJUSTADA PARA 190)
         # ==============================================================================
         with col_meio:
             with st.container(border=True):
@@ -450,7 +450,7 @@ with aba_alocacao:
                 st.plotly_chart(fig_s, use_container_width=True)
 
         # ==============================================================================
-        # COLUNA DIREITA (30%): EXPOSIÇÃO POR GESTORA
+        # COLUNA DIREITA (30%): EXPOSIÇÃO POR GESTORA (INTOCADA)
         # ==============================================================================
         with col_dir:
             with st.container(border=True):
