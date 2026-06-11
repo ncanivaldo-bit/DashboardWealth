@@ -16,7 +16,7 @@ st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
 st.markdown("""
     <style>
-        /* Trava de zoom acidental no celular (duplo toque e arrasto) */
+        /* Trava de zoom acidental no celular */
         * { touch-action: manipulation; }
         
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
@@ -194,28 +194,34 @@ def orquestrar_pipeline_carteira():
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
         
-        # 🛡️ CORREÇÃO DO RE-SAMPLING: Força uma matriz temporal global por ativo
-        df_quant = df_hist_ativos.pivot_table(index='Data', columns='Ticker', values='Quantidade', aggfunc='last')
-        df_custo = df_hist_ativos.pivot_table(index='Data', columns='Ticker', values='Custo_Total', aggfunc='last')
+        # ======================================================================
+        # 🛡️ CORREÇÃO CIRÚRGICA: ESTICANDO A LINHA DO TEMPO DOS ATIVOS
+        # Isso garante que ativos sem movimentação recente continuem sendo 
+        # somados no resample dos meses seguintes (resolvendo Jan/2025).
+        # ======================================================================
+        data_atual = pd.Timestamp.now().normalize()
+        linhas_extensao = []
+        for tk in df_hist_ativos['Ticker'].unique():
+            df_tk = df_hist_ativos[df_hist_ativos['Ticker'] == tk]
+            if not df_tk.empty:
+                ultimo_registro = df_tk.iloc[-1].copy()
+                ultimo_registro['Data'] = data_atual
+                linhas_extensao.append(ultimo_registro)
+                
+        df_hist_ext = pd.concat([df_hist_ativos, pd.DataFrame(linhas_extensao)], ignore_index=True)
+        df_hist_ext = df_hist_ext.sort_values(by=['Data', 'Ticker'])
+        # ======================================================================
         
-        df_quant_m = df_quant.resample('ME').last().ffill()
-        df_custo_m = df_custo.resample('ME').last().ffill()
+        # Voltei para o seu resample limpo original que funcionava perfeito!
+        df_mensal_ativos = (df_hist_ext
+                            .set_index('Data')
+                            .groupby('Ticker')[['Quantidade', 'Custo_Total']]
+                            .resample('ME')
+                            .last()
+                            .ffill()
+                            .reset_index())
         
-        # Injeção forçada do mês corrente para garantir fechamento em tempo real
-        mes_atual_dt = pd.Timestamp.now().to_period('M').to_timestamp(how='E')
-        if mes_atual_dt not in df_quant_m.index:
-            df_quant_m.loc[mes_atual_dt] = np.nan
-            df_quant_m = df_quant_m.sort_index().ffill()
-            df_custo_m.loc[mes_atual_dt] = np.nan
-            df_custo_m = df_custo_m.sort_index().ffill()
-            
-        df_quant_m = df_quant_m.fillna(0)
-        df_custo_m = df_custo_m.fillna(0)
-        
-        df_quant_melt = df_quant_m.unstack().reset_index(name='Quantidade')
-        df_custo_melt = df_custo_m.unstack().reset_index(name='Custo_Total')
-        
-        df_mensal_ativos = pd.merge(df_quant_melt, df_custo_melt, on=['Ticker', 'Data'])
+        df_mensal_ativos.loc[df_mensal_ativos['Quantidade'] <= 0, 'Custo_Total'] = 0.0
         df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
         df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
         
@@ -234,10 +240,6 @@ def orquestrar_pipeline_carteira():
             if col not in df_custodia_atual.columns: 
                 df_custodia_atual[col] = 'NÃO INFORMADO'
             df_custodia_atual[col] = df_custodia_atual[col].fillna('NÃO INFORMADO').astype(str).str.upper()
-            
-        # Repassa o ajuste de strings higienizadas para a tabela mãe histórica
-        for col in ['Classificacao', 'Seguimento', 'Gestora']:
-            df_consolidado[col] = df_consolidado[col].fillna('NÃO INFORMADO').astype(str).str.upper()
         
         return df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes
         
@@ -247,6 +249,7 @@ def orquestrar_pipeline_carteira():
 # 5. EXECUÇÃO DA INTERFACE VISUAL
 # ==============================================================================
 
+# Configuração global anti-zoom para os gráficos no celular
 PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
 
 try:
@@ -274,8 +277,7 @@ if not df_custodia_atual.empty:
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
-# 🎯 CRIAÇÃO DAS 3 ABAS DISPONÍVEIS
-aba_resumo, aba_alocacao, aba_historico = st.tabs(["📝 Resumo", "⚙️ Alocação", "🔍 Histórico Mensal"])
+aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
 
 with aba_resumo:
     def formatar_br(v):
@@ -377,7 +379,6 @@ with aba_resumo:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             
-            # Seletor Amigável de Dimensão de Agrupamento
             visao_selecionada = st.radio("Dimensão:", ["Ativos", "Classificação", "Seguimento"], horizontal=True, label_visibility="collapsed")
             
             if visao_selecionada == "Ativos":
@@ -495,50 +496,5 @@ with aba_alocacao:
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
-# ------------------------------------------------------------------------------
-# 🔍 ABA 3: CENTRAL DE AUDITORIA E HISTÓRICO MENSAL DETALHADO
-# ------------------------------------------------------------------------------
-with aba_historico:
-    if not df_consolidado.empty:
-        st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:10px; color:#2C3E50; font-size:19px; font-weight:600;'>Auditoria de Fechamento Mensal</h3>", unsafe_allow_html=True)
-        
-        # Filtro de dados para auditoria em grade
-        tipo_auditoria = st.radio(
-            "Selecione a métrica para analisar o histórico:", 
-            ["Valor de Mercado (R$)", "Quantidade de Cotas", "Preço de Fechamento (R$)"], 
-            horizontal=True
-        )
-        
-        if tipo_auditoria == "Valor de Mercado (R$)":
-            coluna_valor = 'Patrimonio_Mercado_Ativo'
-            formato_celula = "R$ {:,.2f}"
-        elif tipo_auditoria == "Quantidade de Cotas":
-            coluna_valor = 'Quantidade'
-            formato_celula = "{:,.0f}"
-        else:
-            coluna_valor = 'Preco_Mercado'
-            formato_celula = "R$ {:,.2f}"
-            
-        # Geração da Pivot Table Cruzando Ticker x Mês (Chave_Merge formato YYYY-MM)
-        df_pivot_auditoria = df_consolidado.pivot_table(
-            index='Ticker',
-            columns='Chave_Merge',
-            values=coluna_valor,
-            aggfunc='last'
-        ).fillna(0)
-        
-        # Ordenação cronológica reversa das colunas para facilitar leitura (meses mais novos primeiro)
-        df_pivot_auditoria = df_pivot_auditoria[sorted(df_pivot_auditoria.columns, reverse=True)]
-        
-        # Formatação visual limpa da tabela usando o padrão monetário nacional
-        def aplicar_estilo_br(val):
-            if val == 0:
-                return "-"
-            return formato_celula.format(val).replace(',', 'X').replace('.', ',').replace('X', '.')
-
-        st.dataframe(
-            df_pivot_auditoria.style.applymap(lambda x: 'color: #7F8C8D' if x == 0 else '').format(aplicar_estilo_br),
-            use_container_width=True,
-            height=380
-        )
-        st.info("💡 Use esta tabela para inspecionar o fechamento de Janeiro/2025. Você conseguirá ver com exatidão a quantidade de cotas e o preço de mercado registrado para cada ativo individual naquele mês.")
+    else:
+        st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
