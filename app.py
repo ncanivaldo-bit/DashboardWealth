@@ -16,6 +16,9 @@ st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
 st.markdown("""
     <style>
+        /* Trava de zoom acidental no celular (duplo toque) */
+        * { touch-action: manipulation; }
+        
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
         [data-testid="stMainBlockContainer"] {
             padding-top: 0.8rem !important;
@@ -45,15 +48,13 @@ st.markdown("""
         footer { visibility: hidden; }
         header { visibility: hidden; }
         .stDeployButton { display: none !important; }
-        .viewerBadge_link__1S137 { display: none !important; }
-        a.viewerBadge_link__1S137 { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("PREVPRIV")
 
 # ==============================================================================
-# 2. CONEXÃO DIRETA COM O GOOGLE DRIVE (Com Tratamento de Erros)
+# 2. CONEXÃO DIRETA COM O GOOGLE DRIVE
 # ==============================================================================
 @st.cache_resource
 def get_drive_service():
@@ -170,7 +171,7 @@ def orquestrar_pipeline_carteira():
 
     df_precos_historicos['Chave_Merge'] = df_precos_historicos['Chave_Merge'].astype(str).str.strip()
     
-    conversao_tickers = {"MALL11": "PMLL11", "CVBI11": "PCIP11"}
+    conversao_tickers = {"MALL11": "PMLL11", "CVBI11": "PCIP11", "BOML": "BPML11"}
     df_mov['Ticker'] = df_mov['Ticker'].replace(conversao_tickers)
     df_inf['Ticker'] = df_inf['Ticker'].replace(conversao_tickers)
     df_precos_historicos['Ticker'] = df_precos_historicos['Ticker'].replace(conversao_tickers)
@@ -215,7 +216,6 @@ def orquestrar_pipeline_carteira():
         df_custodia_atual = df_consolidado[df_consolidado['Chave_Merge'] == mes_atual_chave].copy()
         df_custodia_atual = df_custodia_atual[df_custodia_atual['Quantidade'] > 0]
         
-        # 🎯 TRATAMENTO ANTECIPADO DOS DADOS CATEGÓRICOS
         for col in ['Classificacao', 'Seguimento', 'Gestora']:
             if col not in df_custodia_atual.columns: 
                 df_custodia_atual[col] = 'NÃO INFORMADO'
@@ -229,12 +229,14 @@ def orquestrar_pipeline_carteira():
 # 5. EXECUÇÃO DA INTERFACE VISUAL
 # ==============================================================================
 
-# Tratamento Graceful Degradation (Caso o Google Drive falhe ou limites sejam atingidos)
+# Configuração global anti-zoom para os gráficos no celular
+PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
+
 try:
     with st.spinner('Sincronizando custódia com a nuvem...'):
         df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = orquestrar_pipeline_carteira()
 except Exception as e:
-    st.error("⚠️ Falha ao sincronizar com o banco de dados do Google Drive. Verifique sua conexão ou tente novamente em alguns minutos.")
+    st.error("⚠️ Falha ao sincronizar com o banco de dados. Verifique sua conexão.")
     st.stop()
 
 total_investido_kpi = 0.0
@@ -349,83 +351,76 @@ with aba_resumo:
             fig_linhas = go.Figure()
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Patrimonio_Mercado_Ativo'], mode='lines+markers', name='Patrimônio Atual', line=dict(color='#1fbc74', width=3), marker=dict(size=6), fill='tozeroy', fillcolor='rgba(31, 188, 116, 0.06)'))
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Custo_Total'], mode='lines', name='Total Investido', line=dict(color='#118DFF', width=2, dash='dot')))
-            fig_linhas.update_layout(margin=dict(l=45, r=10, t=25, b=10), height=315, hovermode='x unified', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
-            st.plotly_chart(fig_linhas, use_container_width=True)
+            
+            # dragmode=False previne rolagem ruim no mobile
+            fig_linhas.update_layout(margin=dict(l=45, r=10, t=25, b=10), height=315, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
+            
+            # config inibe ferramentas inúteis e melhora foco
+            st.plotly_chart(fig_linhas, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
     with col_bloco_direito:
         with st.container(border=True):
-            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:10px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
             
-            # 🎯 NOVOS FILTROS
-            col_f1, col_f2 = st.columns(2)
-            opcoes_classificacao = ["TODAS"] + sorted(df_custodia_atual['Classificacao'].unique().tolist())
-            opcoes_seguimento = ["TODOS"] + sorted(df_custodia_atual['Seguimento'].unique().tolist())
+            # 🎯 NOVO SELETOR DE DIMENSÃO DA ROSCA
+            visao_selecionada = st.radio("Dimensão:", ["Ativos", "Classificação", "Seguimento"], horizontal=True, label_visibility="collapsed")
             
-            with col_f1:
-                filtro_class = st.selectbox("Classificação:", opcoes_classificacao, index=0)
-            with col_f2:
-                filtro_seg = st.selectbox("Seguimento:", opcoes_seguimento, index=0)
-            
-            # Aplicando a lógica de filtragem
-            df_rosca = df_custodia_atual.copy()
-            if filtro_class != "TODAS":
-                df_rosca = df_rosca[df_rosca['Classificacao'] == filtro_class]
-            if filtro_seg != "TODOS":
-                df_rosca = df_rosca[df_rosca['Seguimento'] == filtro_seg]
-            
-            if not df_rosca.empty:
-                df_rosca = df_rosca.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
-                
-                total_patrimonio_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
-                df_rosca['Percentual'] = (df_rosca['Patrimonio_Mercado_Ativo'] / total_patrimonio_rosca * 100)
-                df_rosca['Label_Legenda'] = df_rosca['Ticker'] + ' - ' + df_rosca['Percentual'].map('{:.1f}%'.format).str.replace('.', ',')
-                
-                fig_p = go.Figure(go.Pie(
-                    labels=df_rosca['Label_Legenda'], 
-                    values=df_rosca['Patrimonio_Mercado_Ativo'], 
-                    hole=0.55, 
-                    textinfo='none',
-                    domain=dict(x=[0, 0.60]),
-                    hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
-                ))
-                
-                fig_p.update_layout(
-                    margin=dict(l=0, r=0, t=5, b=5), 
-                    height=230, 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    showlegend=True, 
-                    legend=dict(
-                        orientation="v", 
-                        yanchor="middle", 
-                        y=0.5, 
-                        xanchor="left", 
-                        x=0.62,
-                        font=dict(size=10)
-                    )
-                )
-                st.plotly_chart(fig_p, use_container_width=True)
+            # Agrupamento Dinâmico de acordo com a seleção
+            if visao_selecionada == "Ativos":
+                df_rosca = df_custodia_atual.copy()
+                coluna_label = 'Ticker'
+            elif visao_selecionada == "Classificação":
+                df_rosca = df_custodia_atual.groupby('Classificacao', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
+                coluna_label = 'Classificacao'
             else:
-                st.warning("⚠️ Nenhum ativo encontrado com esses filtros.")
+                df_rosca = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
+                coluna_label = 'Seguimento'
+            
+            df_rosca = df_rosca.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
+            total_patrimonio_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
+            df_rosca['Percentual'] = (df_rosca['Patrimonio_Mercado_Ativo'] / total_patrimonio_rosca * 100)
+            df_rosca['Label_Legenda'] = df_rosca[coluna_label] + ' - ' + df_rosca['Percentual'].map('{:.1f}%'.format).str.replace('.', ',')
+            
+            fig_p = go.Figure(go.Pie(
+                labels=df_rosca['Label_Legenda'], 
+                values=df_rosca['Patrimonio_Mercado_Ativo'], 
+                hole=0.55, 
+                textinfo='none',
+                domain=dict(x=[0, 0.60]),
+                hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
+            ))
+            
+            fig_p.update_layout(
+                margin=dict(l=0, r=0, t=10, b=10), 
+                height=245, 
+                paper_bgcolor='rgba(0,0,0,0)', 
+                showlegend=True, 
+                dragmode=False,
+                legend=dict(
+                    orientation="v", 
+                    yanchor="middle", 
+                    y=0.5, 
+                    xanchor="left", 
+                    x=0.62,
+                    font=dict(size=10)
+                )
+            )
+            st.plotly_chart(fig_p, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
 # ------------------------------------------------------------------------------
 # ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
 # ------------------------------------------------------------------------------
 with aba_alocacao:
     if not df_custodia_atual.empty:
-        # Reutilizando as colunas já limpas no bloco do Orquestrador
         df_analise = df_custodia_atual.copy()
 
         # 🎯 LAYOUT: Esquerda (30%) | Meio (40%) | Direita (30%)
         col_esq, col_meio, col_dir = st.columns([3, 4, 3])
         
-        # 📏 CÁLCULO EXATO DE SIMETRIA:
         ALTURA_PILARES = 440 
         OVERHEAD_STREAMLIT = 74 
         ALTURA_ROSCAS = (ALTURA_PILARES - OVERHEAD_STREAMLIT) / 2
         
-        # ==============================================================================
-        # COLUNA ESQUERDA (30%): EXPOSIÇÃO POR ATIVO
-        # ==============================================================================
         with col_esq:
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>1. Exposição por Ativo</h4>", unsafe_allow_html=True)
@@ -437,16 +432,13 @@ with aba_alocacao:
                     hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
                 fig_bar_ativos.update_layout(
-                    margin=dict(l=55, r=10, t=10, b=10), height=ALTURA_PILARES,
+                    margin=dict(l=55, r=10, t=10, b=10), height=ALTURA_PILARES, dragmode=False,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
                     yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
                 )
-                st.plotly_chart(fig_bar_ativos, use_container_width=True)
+                st.plotly_chart(fig_bar_ativos, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
-        # ==============================================================================
-        # COLUNA DO MEIO (40%): CLASSIFICAÇÃO SOBRE SEGUIMENTO
-        # ==============================================================================
         with col_meio:
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>2. Classificação</h4>", unsafe_allow_html=True)
@@ -457,8 +449,8 @@ with aba_alocacao:
                     textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                     hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
-                fig_t.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
-                st.plotly_chart(fig_t, use_container_width=True)
+                fig_t.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, dragmode=False, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
+                st.plotly_chart(fig_t, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
                 
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>3. Seguimento</h4>", unsafe_allow_html=True)
@@ -469,12 +461,9 @@ with aba_alocacao:
                     textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
                     hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
                 ))
-                fig_s.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
-                st.plotly_chart(fig_s, use_container_width=True)
+                fig_s.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, dragmode=False, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
+                st.plotly_chart(fig_s, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
-        # ==============================================================================
-        # COLUNA DIREITA (30%): EXPOSIÇÃO POR GESTORA
-        # ==============================================================================
         with col_dir:
             with st.container(border=True):
                 st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
@@ -486,12 +475,12 @@ with aba_alocacao:
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
                 fig_bar_gest.update_layout(
-                    margin=dict(l=75, r=10, t=10, b=10), height=ALTURA_PILARES,
+                    margin=dict(l=75, r=10, t=10, b=10), height=ALTURA_PILARES, dragmode=False,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
                     yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
                 )
-                st.plotly_chart(fig_bar_gest, use_container_width=True)
+                st.plotly_chart(fig_bar_gest, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
     else:
         st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
