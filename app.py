@@ -176,6 +176,16 @@ def orquestrar_pipeline_carteira():
     df_inf = download_excel_from_drive(ID_UNIFICADO, sheet_name='Inf_Ativos')
     df_precos_historicos = download_excel_from_drive(ID_UNIFICADO, sheet_name='Hist_Precos')
     
+    # 🎯 NOVO: Busca Inteligente pelas Metas Setoriais na Planilha (lidando com possíveis variações de nome)
+    df_metricas = pd.DataFrame()
+    for aba_alvo in ['Mtericas', 'Metricas', 'seguimento']:
+        try:
+            df_metricas = download_excel_from_drive(ID_UNIFICADO, sheet_name=aba_alvo)
+            if not df_metricas.empty:
+                break
+        except:
+            continue
+    
     for df in [df_mov, df_inf, df_precos_historicos]:
         df.columns = df.columns.astype(str).str.strip()
         if 'Ticker' in df.columns:
@@ -252,9 +262,9 @@ def orquestrar_pipeline_carteira():
                 df_custodia_atual[col] = 'NÃO INFORMADO'
             df_custodia_atual[col] = df_custodia_atual[col].fillna('NÃO INFORMADO').astype(str).str.upper()
         
-        return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes
+        return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas
         
-    return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
+    return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-", pd.DataFrame()
 
 # ==============================================================================
 # 6. EXECUÇÃO DA INTERFACE VISUAL
@@ -264,7 +274,7 @@ PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
 
 try:
     with st.spinner('A sincronizar custódia com a nuvem...'):
-        df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = orquestrar_pipeline_carteira()
+        df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas = orquestrar_pipeline_carteira()
 except Exception as e:
     st.error("⚠️ Falha ao sincronizar com a base de dados. Verifique a sua ligação.")
     st.stop()
@@ -607,7 +617,28 @@ with aba_rebalanceamento:
     if not df_custodia_atual.empty:
         df_rebal_seg = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
         df_rebal_seg['% Atual'] = (df_rebal_seg['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
-        df_rebal_seg['Meta (%)'] = 100.0 / len(df_rebal_seg)
+        
+        # 🎯 AJUSTE DE METAS: Importa dinamicamente as metas setoriais salvas no Google Drive
+        if not df_metricas.empty:
+            df_metricas.columns = df_metricas.columns.astype(str).str.strip()
+            col_seg = next((c for c in df_metricas.columns if 'seguimento' in c.lower() or 'classe' in c.lower()), df_metricas.columns[0])
+            col_meta = next((c for c in df_metricas.columns if 'meta' in c.lower() or '%' in c.lower()), df_metricas.columns[1])
+            
+            dict_metas = {}
+            for _, row in df_metricas.iterrows():
+                k = str(row[col_seg]).strip().upper()
+                v = str(row[col_meta]).replace(',', '.').replace('%', '').strip()
+                try:
+                    val = float(v)
+                    # Caso a percentagem esteja salva na planilha como decimal (ex: 0.20 em vez de 20%)
+                    if val < 1.5 and val > 0: val = val * 100 
+                    dict_metas[k] = val
+                except:
+                    pass
+            df_rebal_seg['Meta (%)'] = df_rebal_seg['Seguimento'].map(dict_metas).fillna(0.0)
+        else:
+            # Fallback seguro caso a aba Metricas não exista
+            df_rebal_seg['Meta (%)'] = 100.0 / len(df_rebal_seg)
         
         st.markdown("<p style='color:#7F8C8D; font-size:14px; margin-bottom:10px;'>1. Comece definindo as Metas Alvo (%) para os seus Seguimentos:</p>", unsafe_allow_html=True)
         
@@ -626,38 +657,31 @@ with aba_rebalanceamento:
         st.markdown("<br><p style='color:#7F8C8D; font-size:14px; margin-bottom:10px;'>2. Diagnóstico de Aportes Mapeado Diretamente por Ativo (Ticker):</p>", unsafe_allow_html=True)
         
         df_ativos_rebal = df_custodia_atual.copy()
-        
-        # O Preço Médio (Custo_Total / Quantidade) dita as regras de recomendação de compra
         df_ativos_rebal['Preco_Medio'] = np.where(df_ativos_rebal['Quantidade'] > 0, df_ativos_rebal['Custo_Total'] / df_ativos_rebal['Quantidade'], 0)
         df_ativos_rebal['Variacao_Pct'] = np.where(df_ativos_rebal['Preco_Medio'] > 0, (df_ativos_rebal['Preco_Mercado'] / df_ativos_rebal['Preco_Medio']) - 1, 0)
         
         df_ativos_rebal = df_ativos_rebal.merge(df_painel_interativo[['Seguimento', 'Meta (%)']], on='Seguimento', how='left')
         
-        # 🎯 DIVISÃO IGUALITÁRIA POR NÚMERO DE ATIVOS NO SEGUIMENTO
         df_ativos_rebal['Qtd_Ativos_Seg'] = df_ativos_rebal.groupby('Seguimento')['Ticker'].transform('count')
         df_ativos_rebal['Meta_Ativo_Pct'] = df_ativos_rebal['Meta (%)'] / df_ativos_rebal['Qtd_Ativos_Seg']
         df_ativos_rebal['Meta_Ativo_Val'] = (df_ativos_rebal['Meta_Ativo_Pct'] / 100.0) * patrimonio_mercado_kpi
         
         df_ativos_rebal['Diferenca_Val'] = df_ativos_rebal['Meta_Ativo_Val'] - df_ativos_rebal['Patrimonio_Mercado_Ativo']
         
-        # 🎯 MOTOR DE REGRAS INTELIGENTE
+        # 🎯 AJUSTE DE SINALIZAÇÃO DO REBALANCEAMENTO (Queda Brusca e Realização de Lucro)
         def processar_acao(row):
             var = row['Variacao_Pct']
             abaixo_meta = row['Patrimonio_Mercado_Ativo'] < row['Meta_Ativo_Val']
             abaixo_pm = row['Preco_Mercado'] <= row['Preco_Medio']
             
-            # Venda Forçada: Rentabilidade acima ou igual a 20%
-            if var >= 0.20:
-                return "💰 VENDER (Alta >= 20%)"
-                
-            # Alerta Embutido de Quedas Profundas
-            sinal_queda = " (⚠️ Queda >= 10%)" if var <= -0.10 else ""
-            
-            # Compra Segura vs Standby
-            if abaixo_meta and abaixo_pm:
-                return f"🛒 COMPRAR{sinal_queda}"
+            if var <= -0.10:
+                return "QUEDA BRUSCA"
+            elif var >= 0.20:
+                return "VENDER"
+            elif abaixo_meta and abaixo_pm:
+                return "🛒 COMPRAR"
             else:
-                return f"🛡️ AGUARDAR{sinal_queda}"
+                return "🛡️ AGUARDAR"
 
         df_ativos_rebal['Ação Sugerida'] = df_ativos_rebal.apply(processar_acao, axis=1)
         
@@ -671,7 +695,6 @@ with aba_rebalanceamento:
         df_exibicao['% Atual'] = df_exibicao['% Atual Ativo'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
         df_exibicao['Meta Ideal'] = df_exibicao['Meta_Ativo_Pct'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
         
-        # Diferença > 0 = O quanto precisa ser aportado; Diferença < 0 = O quanto ultrapassou a meta
         df_exibicao['Aporte Recomendado'] = df_exibicao['Diferenca_Val'].apply(lambda x: formatar_br(x) if x > 0 else "R$ 0,00")
         
         df_exibicao = df_exibicao[['Ticker', 'Seguimento', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Recomendado', 'Ação Sugerida']]
