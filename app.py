@@ -371,18 +371,20 @@ with aba_resumo:
 
     with col_bloco_direito:
         with st.container(border=True):
-            # Título ajustado estritamente para "Alocação"
             st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação</h3>", unsafe_allow_html=True)
             
-            # 🎯 ENGENHARIA DA EXPLOSÃO: Injeta a raiz comum "Carteira" para fixá-la no centro
             df_sunburst = df_custodia_atual.copy()
             df_sunburst['Raiz'] = 'Carteira'
+            
+            # 🎯 NOVA PALETA TRANQUILA: O primeiro item ('#2C3E50') colore o centro 'Carteira', eliminando o branco.
+            # Os demais itens trazem tons calmos de verde, azul e cinza que combinam com o painel.
+            paleta_tranquila = ['#2C3E50', '#2E8B57', '#118DFF', '#7F8C8D', '#52BE80', '#5DADE2', '#95A5A6', '#A5D6A7']
             
             fig_p = px.sunburst(
                 df_sunburst,
                 path=['Raiz', 'Classificacao', 'Seguimento', 'Ticker'],
                 values='Patrimonio_Mercado_Ativo',
-                color_discrete_sequence=px.colors.qualitative.Prism
+                color_discrete_sequence=paleta_tranquila
             )
             
             fig_p.update_layout(
@@ -392,7 +394,6 @@ with aba_resumo:
                 dragmode=False
             )
             
-            # 🎯 CONFIGURAÇÃO DAS FATIAS: Rótulo + Percentual do topo visíveis e balão customizado
             fig_p.update_traces(
                 textinfo="label+percent root",
                 hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
