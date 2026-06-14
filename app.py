@@ -155,7 +155,18 @@ def extrair_kpis_proventos(df_mov):
     return total_dividendos_historico, ultimo_provento_valor, ultimo_provento_mes_ano
 
 # ==============================================================================
-# 4. ORQUESTRAÇÃO DE DADOS (CACHEADA)
+# 4. FUNÇÕES GLOBAIS DE FORMATAÇÃO
+# ==============================================================================
+def formatar_br(v):
+    prefixo = "-" if v < 0 else ""
+    return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    
+def formatar_pct(v):
+    prefixo = "+" if v > 0 else ""
+    return f"{prefixo}{v:.2f}%".replace('.', ',')
+
+# ==============================================================================
+# 5. ORQUESTRAÇÃO DE DADOS (CACHEADA)
 # ==============================================================================
 @st.cache_data(ttl=600, show_spinner=False)
 def orquestrar_pipeline_carteira():
@@ -246,7 +257,7 @@ def orquestrar_pipeline_carteira():
     return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
 
 # ==============================================================================
-# 5. EXECUÇÃO DA INTERFACE VISUAL
+# 6. EXECUÇÃO DA INTERFACE VISUAL
 # ==============================================================================
 
 PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
@@ -276,18 +287,10 @@ if not df_custodia_atual.empty:
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
-# 🎯 CONFIGURAÇÃO DAS ABAS REESTRUTURADAS
+# Abas reestruturadas
 aba_resumo, aba_exposicao, aba_proventos, aba_rebalanceamento = st.tabs([
     "📝 Resumo", "📊 Exposição", "💰 Proventos", "⚖️ Rebalanceamento"
 ])
-
-def formatar_br(v):
-    prefixo = "-" if v < 0 else ""
-    return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    
-def formatar_pct(v):
-    prefixo = "+" if v > 0 else ""
-    return f"{prefixo}{v:.2f}%".replace('.', ',')
 
 # ==============================================================================
 # ABA 1: RESUMO
@@ -427,7 +430,7 @@ with aba_resumo:
             st.plotly_chart(fig_p, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
 # ==============================================================================
-# ABA 2: EXPOSIÇÃO (Antiga aba Alocação)
+# ABA 2: EXPOSIÇÃO
 # ==============================================================================
 with aba_exposicao:
     if not df_custodia_atual.empty:
@@ -503,7 +506,7 @@ with aba_exposicao:
         st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de exposição.")
 
 # ==============================================================================
-# ABA 3: PROVENTOS (Nova Aba Inteligente)
+# ABA 3: PROVENTOS (KPIs customizados no estilo Resumo)
 # ==============================================================================
 with aba_proventos:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Módulo de Renda Passiva</h3>", unsafe_allow_html=True)
@@ -512,16 +515,59 @@ with aba_proventos:
     df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
     if not df_prov_detalhe.empty:
-        # Criação de Métricas de Eficiência em Renda
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric("Total de Proventos Históricos", formatar_br(total_dividendos))
-        with c2:
-            media_mensal_prov = total_dividendos / max(len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique()), 1)
-            st.metric("Média Mensal Recebida", formatar_br(media_mensal_prov))
-        with c3:
-            yoc_medio = (total_dividendos / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
-            st.metric("Yield on Cost Histórico Amortizado", f"{yoc_medio:.2f}%")
+        # Motores de cálculo de renda passiva
+        media_mensal_prov = total_dividendos / max(len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique()), 1)
+        yoc_medio = (total_dividendos / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
+        yield_ultimo_mensal = (ult_provento_val / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
+        
+        # 🎯 AJUSTE SOLICITADO: KPIs estilizados via HTML combinando com a aba resumo
+        cp1, cp2, cp3 = st.columns(3)
+        
+        with cp1:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                    <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Último Provento Recebido</span>
+                    <div style="color: #2E8B57; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(ult_provento_val)}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Representação/Aporte:</span>
+                            <strong style="color: #2E8B57;">{yield_ultimo_mensal:.2f}% do inv.</strong>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Ref:</span>
+                            <strong style="color: #34495E;">{ult_provento_mes}</strong>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with cp2:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                    <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Total de Proventos Históricos</span>
+                    <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(total_dividendos)}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Yield on Cost Médio:</span>
+                            <strong style="color: #118DFF;">{yoc_medio:.2f}% Amort.</strong>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with cp3:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                    <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Média Mensal de Caixa</span>
+                    <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(media_mensal_prov)}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Meses com Histórico:</span>
+                            <strong style="color: #34495E;">{len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique())} meses</strong>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
             
         col_graf_esq, col_graf_dir = st.columns([6, 4])
         
@@ -556,7 +602,7 @@ with aba_proventos:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
 # ==============================================================================
-# ABA 4: REBALANCEAMENTO (Nova Aba Inteligente e Interativa)
+# ABA 4: REBALANCEAMENTO
 # ==============================================================================
 with aba_rebalanceamento:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
@@ -566,10 +612,8 @@ with aba_rebalanceamento:
         df_rebal_base = df_custodia_atual[['Ticker', 'Classificacao', 'Seguimento', 'Patrimonio_Mercado_Ativo']].copy()
         df_rebal_base['% Atual'] = (df_rebal_base['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
         
-        # Define uma meta padrão linear sugerida uniforme (Surpresa de Automação)
         df_rebal_base['Meta (%)'] = 100.0 / len(df_rebal_base)
         
-        # Streamlit Data Editor para digitação interativa de metas na tela
         df_painel_interativo = st.data_editor(
             df_rebal_base,
             column_config={
@@ -584,11 +628,10 @@ with aba_rebalanceamento:
             use_container_width=True
         )
         
-        # Motores de Cálculo de Rebalanceamento em tempo real
         df_painel_interativo['Diferença (R$)'] = ((df_painel_interativo['Meta (%)'] / 100.0) * patrimonio_mercado_kpi) - df_painel_interativo['Patrimonio_Mercado_Ativo']
         
         def processar_sinal(dif):
-            if dif > 50.0:  # Margem de tolerância de R$ 50 para evitar ruídos de ordens fracionárias
+            if dif > 50.0:
                 return "🛒 COMPRAR"
             elif dif < -50.0:
                 return "🛡️ AGUARDAR"
@@ -597,10 +640,8 @@ with aba_rebalanceamento:
                 
         df_painel_interativo['Ação Sugerida'] = df_painel_interativo['Diferença (R$)'].apply(processar_sinal)
         
-        # Exibição dos Resultados Consolidados do Rebalanceamento
         df_exibicao_rebal = df_painel_interativo[['Ticker', 'Patrimonio_Mercado_Ativo', '% Atual', 'Meta (%)', 'Diferença (R$)', 'Ação Sugerida']].copy()
         
-        # Formatação cosmética final das colunas calculadas para o investidor
         df_exibicao_rebal['Patrimônio Atual'] = df_exibicao_rebal['Patrimonio_Mercado_Ativo'].apply(formatar_br)
         df_exibicao_rebal['% Atual'] = df_exibicao_rebal['% Atual'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
         df_exibicao_rebal['Meta (%)'] = df_exibicao_rebal['Meta (%)'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
