@@ -599,59 +599,87 @@ with aba_proventos:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
 # ==============================================================================
-# ABA 4: REBALANCEAMENTO (Reestruturada por Seguimento)
+# ABA 4: REBALANCEAMENTO
 # ==============================================================================
 with aba_rebalanceamento:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#7F8C8D; font-size:13px; margin-bottom:10px;'>Ajuste as metas percentuais por <b>Seguimento</b> diretamente na tabela abaixo para simular aportes e rebalancear a sua carteira em tempo real.</p>", unsafe_allow_html=True)
     
     if not df_custodia_atual.empty:
-        # 🎯 AJUSTE SOLICITADO: Agrupamento da base de rebalanceamento no nível de SEGUIMENTO
-        df_rebal_base = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
-        df_rebal_base['% Atual'] = (df_rebal_base['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
+        df_rebal_seg = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
+        df_rebal_seg['% Atual'] = (df_rebal_seg['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
+        df_rebal_seg['Meta (%)'] = 100.0 / len(df_rebal_seg)
         
-        # Meta padrão uniforme sugerida por setor
-        df_rebal_base['Meta (%)'] = 100.0 / len(df_rebal_base)
+        st.markdown("<p style='color:#7F8C8D; font-size:14px; margin-bottom:10px;'>1. Comece definindo as Metas Alvo (%) para os seus Seguimentos:</p>", unsafe_allow_html=True)
         
-        # Grade interativa no nível de seguimento
         df_painel_interativo = st.data_editor(
-            df_rebal_base,
+            df_rebal_seg,
             column_config={
                 "Seguimento": st.column_config.TextColumn("Seguimento", disabled=True),
                 "Patrimonio_Mercado_Ativo": st.column_config.NumberColumn("Patrimônio Atual", format="R$ %,.2f", disabled=True),
                 "% Atual": st.column_config.NumberColumn("% Atual", format="%.2f%%", disabled=True),
-                "Meta (%)": st.column_config.NumberColumn("Sua Meta (%)", min_value=0.0, max_value=100.0, format="%.2f%%", help="Altere as metas setoriais para recalcular as necessidades de aporte.")
+                "Meta (%)": st.column_config.NumberColumn("Sua Meta (%)", min_value=0.0, max_value=100.0, format="%.2f%%")
             },
             hide_index=True,
             use_container_width=True
         )
         
-        # Motores de cálculo de desvio patrimonial por setor
-        df_painel_interativo['Diferença (R$)'] = ((df_painel_interativo['Meta (%)'] / 100.0) * patrimonio_mercado_kpi) - df_painel_interativo['Patrimonio_Mercado_Ativo']
+        st.markdown("<br><p style='color:#7F8C8D; font-size:14px; margin-bottom:10px;'>2. Diagnóstico de Aportes Mapeado Diretamente por Ativo (Ticker):</p>", unsafe_allow_html=True)
         
-        def processar_sinal(dif):
-            if dif > 50.0:  # Margem de corte de R$ 50 para mitigar ruídos operacionais
-                return "🛒 COMPRAR"
-            elif dif < -50.0:
-                return "🛡️ AGUARDAR"
-            else:
-                return "✅ OK"
+        df_ativos_rebal = df_custodia_atual.copy()
+        
+        # O Preço Médio (Custo_Total / Quantidade) dita as regras de recomendação de compra
+        df_ativos_rebal['Preco_Medio'] = np.where(df_ativos_rebal['Quantidade'] > 0, df_ativos_rebal['Custo_Total'] / df_ativos_rebal['Quantidade'], 0)
+        df_ativos_rebal['Variacao_Pct'] = np.where(df_ativos_rebal['Preco_Medio'] > 0, (df_ativos_rebal['Preco_Mercado'] / df_ativos_rebal['Preco_Medio']) - 1, 0)
+        
+        df_ativos_rebal = df_ativos_rebal.merge(df_painel_interativo[['Seguimento', 'Meta (%)']], on='Seguimento', how='left')
+        
+        # 🎯 DIVISÃO IGUALITÁRIA POR NÚMERO DE ATIVOS NO SEGUIMENTO
+        df_ativos_rebal['Qtd_Ativos_Seg'] = df_ativos_rebal.groupby('Seguimento')['Ticker'].transform('count')
+        df_ativos_rebal['Meta_Ativo_Pct'] = df_ativos_rebal['Meta (%)'] / df_ativos_rebal['Qtd_Ativos_Seg']
+        df_ativos_rebal['Meta_Ativo_Val'] = (df_ativos_rebal['Meta_Ativo_Pct'] / 100.0) * patrimonio_mercado_kpi
+        
+        df_ativos_rebal['Diferenca_Val'] = df_ativos_rebal['Meta_Ativo_Val'] - df_ativos_rebal['Patrimonio_Mercado_Ativo']
+        
+        # 🎯 MOTOR DE REGRAS INTELIGENTE
+        def processar_acao(row):
+            var = row['Variacao_Pct']
+            abaixo_meta = row['Patrimonio_Mercado_Ativo'] < row['Meta_Ativo_Val']
+            abaixo_pm = row['Preco_Mercado'] <= row['Preco_Medio']
+            
+            # Venda Forçada: Rentabilidade acima ou igual a 20%
+            if var >= 0.20:
+                return "💰 VENDER (Alta >= 20%)"
                 
-        df_painel_interativo['Ação Sugerida'] = df_painel_interativo['Diferença (R$)'].apply(processar_sinal)
+            # Alerta Embutido de Quedas Profundas
+            sinal_queda = " (⚠️ Queda >= 10%)" if var <= -0.10 else ""
+            
+            # Compra Segura vs Standby
+            if abaixo_meta and abaixo_pm:
+                return f"🛒 COMPRAR{sinal_queda}"
+            else:
+                return f"🛡️ AGUARDAR{sinal_queda}"
+
+        df_ativos_rebal['Ação Sugerida'] = df_ativos_rebal.apply(processar_acao, axis=1)
         
-        df_exibicao_rebal = df_painel_interativo[['Seguimento', 'Patrimonio_Mercado_Ativo', '% Atual', 'Meta (%)', 'Diferença (R$)', 'Ação Sugerida']].copy()
+        df_ativos_rebal['% Atual Ativo'] = (df_ativos_rebal['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
         
-        # Formatação para exibição na grade final do usuário
-        df_exibicao_rebal['Patrimônio Atual'] = df_exibicao_rebal['Patrimonio_Mercado_Ativo'].apply(formatar_br)
-        df_exibicao_rebal['% Atual'] = df_exibicao_rebal['% Atual'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
-        df_exibicao_rebal['Meta (%)'] = df_exibicao_rebal['Meta (%)'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
-        df_exibicao_rebal['Diferença Financeira'] = df_exibicao_rebal['Diferença (R$)'].apply(formatar_br)
+        df_exibicao = df_ativos_rebal[['Ticker', 'Seguimento', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
         
-        st.markdown("<br><h4 style='color:#2C3E50; font-size:16px;'>Diagnóstico de Aportes por Seguimento para o Mês Corrente</h4>", unsafe_allow_html=True)
+        df_exibicao['Preço Médio'] = df_exibicao['Preco_Medio'].apply(formatar_br)
+        df_exibicao['Preço Atual'] = df_exibicao['Preco_Mercado'].apply(formatar_br)
+        df_exibicao['Variação'] = df_exibicao['Variacao_Pct'].apply(lambda x: f"{x*100:.2f}%".replace('.', ','))
+        df_exibicao['% Atual'] = df_exibicao['% Atual Ativo'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
+        df_exibicao['Meta Ideal'] = df_exibicao['Meta_Ativo_Pct'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
+        
+        # Diferença > 0 = O quanto precisa ser aportado; Diferença < 0 = O quanto ultrapassou a meta
+        df_exibicao['Aporte Recomendado'] = df_exibicao['Diferenca_Val'].apply(lambda x: formatar_br(x) if x > 0 else "R$ 0,00")
+        
+        df_exibicao = df_exibicao[['Ticker', 'Seguimento', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Recomendado', 'Ação Sugerida']]
+        
         st.dataframe(
-            df_exibicao_rebal[['Seguimento', 'Patrimônio Atual', '% Atual', 'Meta (%)', 'Diferença Financeira', 'Ação Sugerida']],
+            df_exibicao.sort_values(by=['Seguimento', 'Ticker']),
             use_container_width=True,
             hide_index=True
         )
     else:
-        st.info("ℹ freezer Sem posições ativas em custódia para gerar matriz de rebalanceamento setorial.")
+        st.info("ℹ️ Sem posições ativas em custódia para gerar matriz de rebalanceamento.")
