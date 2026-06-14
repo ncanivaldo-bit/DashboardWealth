@@ -195,7 +195,6 @@ def orquestrar_pipeline_carteira():
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
         
-        # Extensão da linha do tempo para preservar ativos estáticos (Jan/2025)
         data_atual = pd.Timestamp.now().normalize()
         linhas_extensao = []
         for tk in df_hist_ativos['Ticker'].unique():
@@ -220,11 +219,20 @@ def orquestrar_pipeline_carteira():
         df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
         df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
         
+        # Cruzamento inicial com o histórico fornecido
         df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
+        
+        # 🎯 AJUSTE CRUCIAL: Propagação inteligente de cotações históricas
+        # Garante que meses sem dados (como Jan/2025) herdem o último valor de mercado conhecido
+        df_consolidado = df_consolidado.sort_values(by=['Data', 'Ticker'])
+        df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
+        
         df_consolidado = pd.merge(df_consolidado, df_inf, on='Ticker', how='left')
         
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
+        
+        # Fallback definitivo caso o ativo nunca tenha tido preço histórico registrado
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
@@ -383,22 +391,19 @@ with aba_resumo:
                 values='Patrimonio_Mercado_Ativo'
             )
             
-            # 🎯 ENGENHARIA DE CORES POR PROFUNDIDADE (Efeito Degradê Monocromático)
             if fig_p.data and fig_p.data[0].ids is not None:
                 cores_fatias = []
                 for id_str in fig_p.data[0].ids:
-                    # A profundidade é dada pela quantidade de barras (/) no ID da hierarquia
                     depth = str(id_str).count('/')
                     if depth == 0:
-                        cores_fatias.append('#1D4E5B') # Nível 0: Centro Escuro (Carteira)
+                        cores_fatias.append('#1D4E5B')
                     elif depth == 1:
-                        cores_fatias.append('#3A7385') # Nível 1: Classes (Tijolo, Papel)
+                        cores_fatias.append('#3A7385')
                     elif depth == 2:
-                        cores_fatias.append('#8EBEC9') # Nível 2: Seguimentos (Shopping, Logístico)
+                        cores_fatias.append('#87B6C4')
                     else:
-                        cores_fatias.append('#C6E0E5') # Nível 3: Tickers mais claros na borda externa
+                        cores_fatias.append('#C2E2EB')
                 
-                # 🎯 AJUSTE DE CONTORNO (Linha de divisão com a mesma cor do centro)
                 fig_p.update_traces(marker=dict(
                     colors=cores_fatias,
                     line=dict(color='#1D4E5B', width=1.5)
@@ -411,7 +416,6 @@ with aba_resumo:
                 dragmode=False
             )
             
-            # Força o percentual no anel externo e o nome da fatia
             fig_p.update_traces(
                 textinfo="label+percent root",
                 hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
