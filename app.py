@@ -176,7 +176,6 @@ def orquestrar_pipeline_carteira():
     df_inf = download_excel_from_drive(ID_UNIFICADO, sheet_name='Inf_Ativos')
     df_precos_historicos = download_excel_from_drive(ID_UNIFICADO, sheet_name='Hist_Precos')
     
-    # 🎯 NOVO: Busca Inteligente pelas Metas Setoriais na Planilha (lidando com possíveis variações de nome)
     df_metricas = pd.DataFrame()
     for aba_alvo in ['Mtericas', 'Metricas', 'seguimento']:
         try:
@@ -609,7 +608,7 @@ with aba_proventos:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
 # ==============================================================================
-# ABA 4: REBALANCEAMENTO
+# ABA 4: REBALANCEAMENTO (Remoção da tabela editável e adição de Filtro Setorial)
 # ==============================================================================
 with aba_rebalanceamento:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
@@ -618,7 +617,7 @@ with aba_rebalanceamento:
         df_rebal_seg = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
         df_rebal_seg['% Atual'] = (df_rebal_seg['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
         
-        # 🎯 AJUSTE DE METAS: Importa dinamicamente as metas setoriais salvas no Google Drive
+        # Leitura estática e segura dos parâmetros da aba Mtericas/Metricas da sua planilha
         if not df_metricas.empty:
             df_metricas.columns = df_metricas.columns.astype(str).str.strip()
             col_seg = next((c for c in df_metricas.columns if 'seguimento' in c.lower() or 'classe' in c.lower()), df_metricas.columns[0])
@@ -630,45 +629,30 @@ with aba_rebalanceamento:
                 v = str(row[col_meta]).replace(',', '.').replace('%', '').strip()
                 try:
                     val = float(v)
-                    # Caso a percentagem esteja salva na planilha como decimal (ex: 0.20 em vez de 20%)
                     if val < 1.5 and val > 0: val = val * 100 
                     dict_metas[k] = val
                 except:
                     pass
             df_rebal_seg['Meta (%)'] = df_rebal_seg['Seguimento'].map(dict_metas).fillna(0.0)
         else:
-            # Fallback seguro caso a aba Metricas não exista
             df_rebal_seg['Meta (%)'] = 100.0 / len(df_rebal_seg)
-        
-        st.markdown("<p style='color:#7F8C8D; font-size:14px; margin-bottom:10px;'>1. Comece definindo as Metas Alvo (%) para os seus Seguimentos:</p>", unsafe_allow_html=True)
-        
-        df_painel_interativo = st.data_editor(
-            df_rebal_seg,
-            column_config={
-                "Seguimento": st.column_config.TextColumn("Seguimento", disabled=True),
-                "Patrimonio_Mercado_Ativo": st.column_config.NumberColumn("Patrimônio Atual", format="R$ %,.2f", disabled=True),
-                "% Atual": st.column_config.NumberColumn("% Atual", format="%.2f%%", disabled=True),
-                "Meta (%)": st.column_config.NumberColumn("Sua Meta (%)", min_value=0.0, max_value=100.0, format="%.2f%%")
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-        
-        st.markdown("<br><p style='color:#7F8C8D; font-size:14px; margin-bottom:10px;'>2. Diagnóstico de Aportes Mapeado Diretamente por Ativo (Ticker):</p>", unsafe_allow_html=True)
+            
+        # 🎯 AJUSTE SOLICITADO: Filtro suspenso dinâmico substituindo a primeira tabela
+        lista_seguimentos = sorted(df_custodia_atual['Seguimento'].unique().tolist())
+        seg_selecionado = st.selectbox("Selecione o Seguimento para Filtragem:", ["TODOS"] + lista_seguimentos)
         
         df_ativos_rebal = df_custodia_atual.copy()
         df_ativos_rebal['Preco_Medio'] = np.where(df_ativos_rebal['Quantidade'] > 0, df_ativos_rebal['Custo_Total'] / df_ativos_rebal['Quantidade'], 0)
         df_ativos_rebal['Variacao_Pct'] = np.where(df_ativos_rebal['Preco_Medio'] > 0, (df_ativos_rebal['Preco_Mercado'] / df_ativos_rebal['Preco_Medio']) - 1, 0)
         
-        df_ativos_rebal = df_ativos_rebal.merge(df_painel_interativo[['Seguimento', 'Meta (%)']], on='Seguimento', how='left')
+        df_ativos_rebal = df_ativos_rebal.merge(df_rebal_seg[['Seguimento', 'Meta (%)']], on='Seguimento', how='left')
         
         df_ativos_rebal['Qtd_Ativos_Seg'] = df_ativos_rebal.groupby('Seguimento')['Ticker'].transform('count')
         df_ativos_rebal['Meta_Ativo_Pct'] = df_ativos_rebal['Meta (%)'] / df_ativos_rebal['Qtd_Ativos_Seg']
         df_ativos_rebal['Meta_Ativo_Val'] = (df_ativos_rebal['Meta_Ativo_Pct'] / 100.0) * patrimonio_mercado_kpi
-        
         df_ativos_rebal['Diferenca_Val'] = df_ativos_rebal['Meta_Ativo_Val'] - df_ativos_rebal['Patrimonio_Mercado_Ativo']
         
-        # 🎯 AJUSTE DE SINALIZAÇÃO DO REBALANCEAMENTO (Queda Brusca e Realização de Lucro)
+        # 🎯 AJUSTE SOLICITADO: Regras operacionais atualizadas
         def processar_acao(row):
             var = row['Variacao_Pct']
             abaixo_meta = row['Patrimonio_Mercado_Ativo'] < row['Meta_Ativo_Val']
@@ -684,23 +668,81 @@ with aba_rebalanceamento:
                 return "🛡️ AGUARDAR"
 
         df_ativos_rebal['Ação Sugerida'] = df_ativos_rebal.apply(processar_acao, axis=1)
-        
         df_ativos_rebal['% Atual Ativo'] = (df_ativos_rebal['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
         
-        df_exibicao = df_ativos_rebal[['Ticker', 'Seguimento', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
+        # 🎯 AJUSTE SOLICITADO: Cálculo do valor Investido vs Ideal setorial com base no filtro
+        if seg_selecionado == "TODOS":
+            patrimonio_seg_atual = patrimonio_mercado_kpi
+            patrimonio_seg_ideal = patrimonio_mercado_kpi
+            df_ativos_filtrados = df_ativos_rebal.copy()
+        else:
+            patrimonio_seg_atual = df_rebal_seg[df_rebal_seg['Seguimento'] == seg_selecionado]['Patrimonio_Mercado_Ativo'].sum()
+            meta_seg_pct = df_rebal_seg[df_rebal_seg['Seguimento'] == seg_selecionado]['Meta (%)'].sum()
+            patrimonio_seg_ideal = (meta_seg_pct / 100.0) * patrimonio_mercado_kpi
+            df_ativos_filtrados = df_ativos_rebal[df_ativos_rebal['Seguimento'] == seg_selecionado].copy()
+            
+        # Exibição dos Blocos de Indicadores Setoriais
+        col_rebal_kpi1, col_rebal_kpi2, col_rebal_kpi3 = st.columns(3)
+        with col_rebal_kpi1:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 90px; max-height: 90px;">
+                    <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual ({seg_selecionado})</span>
+                    <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(patrimonio_seg_atual)}</div>
+                </div>
+            """, unsafe_allow_html=True)
+        with col_rebal_kpi2:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 90px; max-height: 90px;">
+                    <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Patrimônio Ideal ({seg_selecionado})</span>
+                    <div style="color: #118DFF; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(patrimonio_seg_ideal)}</div>
+                </div>
+            """, unsafe_allow_html=True)
+        with col_rebal_kpi3:
+            diferenca_seg = patrimonio_seg_ideal - patrimonio_seg_atual
+            cor_dif_seg = "#2E8B57" if diferenca_seg > 0 else "#CD5C5C"
+            txt_dif_seg = "Falta Aportar" if diferenca_seg > 0 else "Excedido"
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 90px; max-height: 90px;">
+                    <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Diferença ({txt_dif_seg})</span>
+                    <div style="color: {cor_dif_seg}; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(abs(diferenca_seg))}</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        df_exibicao['Preço Médio'] = df_exibicao['Preco_Medio'].apply(formatar_br)
-        df_exibicao['Preço Atual'] = df_exibicao['Preco_Mercado'].apply(formatar_br)
-        df_exibicao['Variação'] = df_exibicao['Variacao_Pct'].apply(lambda x: f"{x*100:.2f}%".replace('.', ','))
-        df_exibicao['% Atual'] = df_exibicao['% Atual Ativo'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
-        df_exibicao['Meta Ideal'] = df_exibicao['Meta_Ativo_Pct'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
+        # Estruturação da tabela final de Auditoria de Ativos
+        df_exibicao = df_ativos_filtrados[['Ticker', 'Seguimento', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
+        df_exibicao.columns = ['Ativo', 'Seguimento', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Rec.', 'Ação Sugerida']
         
-        df_exibicao['Aporte Recomendado'] = df_exibicao['Diferenca_Val'].apply(lambda x: formatar_br(x) if x > 0 else "R$ 0,00")
+        # Funções internas para formatação via Styler (mantendo os dados puros em float no DataFrame)
+        def fmt_br_pct_local(v):
+            v_100 = v * 100
+            prefixo = "+" if v_100 > 0 else ""
+            return f"{prefixo}{v_100:.2f}%".replace('.', ',')
+            
+        def fmt_br_pct_pure_local(v):
+            return f"{v:.2f}%".replace('.', ',')
+            
+        # 🎯 AJUSTE SOLICITADO: Função de coloração condicional de Variação para dispositivos móveis
+        def color_variacao(val):
+            if val > 0:
+                return 'color: #2E8B57; font-weight: bold;'
+            elif val < 0:
+                return 'color: #CD5C5C; font-weight: bold;'
+            return ''
+            
+        df_styled = df_exibicao.style.format({
+            'Preço Médio': formatar_br,
+            'Preço Atual': formatar_br,
+            'Variação': fmt_br_pct_local,
+            '% Atual': fmt_br_pct_pure_local,
+            'Meta Ideal': fmt_br_pct_pure_local,
+            'Aporte Rec.': lambda x: formatar_br(x) if x > 0 else "R$ 0,00"
+        }).applymap(color_variacao, subset=['Variação'])
         
-        df_exibicao = df_exibicao[['Ticker', 'Seguimento', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Recomendado', 'Ação Sugerida']]
-        
+        # 🎯 AJUSTE SOLICITADO: Renderização via st.dataframe pura que escala perfeitamente em telas móveis
         st.dataframe(
-            df_exibicao.sort_values(by=['Seguimento', 'Ticker']),
+            df_styled,
             use_container_width=True,
             hide_index=True
         )
