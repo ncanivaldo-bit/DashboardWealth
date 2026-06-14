@@ -738,7 +738,7 @@ with aba_rebalanceamento:
             '% Atual': fmt_br_pct_pure_local,
             'Meta Ideal': fmt_br_pct_pure_local,
             'Aporte Rec.': lambda x: formatar_br(x) if x > 0 else "R$ 0,00"
-        }).applymap(color_variacao, subset=['Variação'])
+        }).map(color_variacao, subset=['Variação'])
         
         # 🎯 AJUSTE SOLICITADO: Renderização via st.dataframe pura que escala perfeitamente em telas móveis
         st.dataframe(
