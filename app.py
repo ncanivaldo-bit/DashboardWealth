@@ -376,9 +376,9 @@ with aba_resumo:
             df_sunburst = df_custodia_atual.copy()
             df_sunburst['Raiz'] = 'Carteira'
             
-            # 🎯 NOVA PALETA TRANQUILA: O primeiro item ('#2C3E50') colore o centro 'Carteira', eliminando o branco.
-            # Os demais itens trazem tons calmos de verde, azul e cinza que combinam com o painel.
-            paleta_tranquila = ['#2C3E50', '#2E8B57', '#118DFF', '#7F8C8D', '#52BE80', '#5DADE2', '#95A5A6', '#A5D6A7']
+            # 🎯 AJUSTE DE COR SINTONIZADO: O tom exato de verde ('#1fbc74') assume a primeira posição.
+            # Isso faz com que a fatia central "Carteira" combine diretamente com a linha do Patrimônio Atual.
+            paleta_tranquila = ['#1fbc74', '#2C3E50', '#118DFF', '#7F8C8D', '#52BE80', '#5DADE2', '#95A5A6', '#A5D6A7']
             
             fig_p = px.sunburst(
                 df_sunburst,
