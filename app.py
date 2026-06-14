@@ -184,7 +184,9 @@ def orquestrar_pipeline_carteira():
         df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
 
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
-    df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce').fillna(0)
+    
+    # 🎯 CORREÇÃO 1: Mantém os NaNs intactos temporariamente para não quebrar a lógica do ffill adiante
+    df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce')
 
     eventos_custodia = ['Compra', 'Venda', 'Desdobro']
     df_trades = df_mov[df_mov['Movimentação'].isin(eventos_custodia)].sort_values('Data_Datetime').copy()
@@ -195,6 +197,7 @@ def orquestrar_pipeline_carteira():
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
         
+        # Extensão de linha do tempo
         data_atual = pd.Timestamp.now().normalize()
         linhas_extensao = []
         for tk in df_hist_ativos['Ticker'].unique():
@@ -219,11 +222,10 @@ def orquestrar_pipeline_carteira():
         df_mensal_ativos['Chave_Merge'] = df_mensal_ativos['Data'].dt.strftime('%Y-%m')
         df_mensal_ativos['Mes_Ano'] = df_mensal_ativos['Data'].dt.to_period('M')
         
-        # Cruzamento inicial com o histórico fornecido
         df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
         
-        # 🎯 AJUSTE CRUCIAL: Propagação inteligente de cotações históricas
-        # Garante que meses sem dados (como Jan/2025) herdem o último valor de mercado conhecido
+        # 🎯 CORREÇÃO 2: Trata zeros explícitos como NaN para permitir a propagação correta de meses anteriores
+        df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].replace(0, np.nan)
         df_consolidado = df_consolidado.sort_values(by=['Data', 'Ticker'])
         df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
         
@@ -232,7 +234,7 @@ def orquestrar_pipeline_carteira():
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
         
-        # Fallback definitivo caso o ativo nunca tenha tido preço histórico registrado
+        # Fallback para preço médio caso o ativo nunca tenha tido preço histórico registrado
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
