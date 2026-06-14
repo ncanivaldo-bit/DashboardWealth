@@ -371,12 +371,16 @@ with aba_resumo:
 
     with col_bloco_direito:
         with st.container(border=True):
-            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Dinâmica (Explosão)</h3>", unsafe_allow_html=True)
+            # Título ajustado estritamente para "Alocação"
+            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação</h3>", unsafe_allow_html=True)
             
-            # 🎯 SUBSTITUIÇÃO EXCLUSIVA: Gráfico Sunburst Hierárquico Inteligente
+            # 🎯 ENGENHARIA DA EXPLOSÃO: Injeta a raiz comum "Carteira" para fixá-la no centro
+            df_sunburst = df_custodia_atual.copy()
+            df_sunburst['Raiz'] = 'Carteira'
+            
             fig_p = px.sunburst(
-                df_custodia_atual,
-                path=['Classificacao', 'Seguimento', 'Ticker'],
+                df_sunburst,
+                path=['Raiz', 'Classificacao', 'Seguimento', 'Ticker'],
                 values='Patrimonio_Mercado_Ativo',
                 color_discrete_sequence=px.colors.qualitative.Prism
             )
@@ -388,7 +392,9 @@ with aba_resumo:
                 dragmode=False
             )
             
+            # 🎯 CONFIGURAÇÃO DAS FATIAS: Rótulo + Percentual do topo visíveis e balão customizado
             fig_p.update_traces(
+                textinfo="label+percent root",
                 hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
             )
             
