@@ -17,7 +17,7 @@ st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
 st.markdown("""
     <style>
-        /* Trava de zoom acidental no celular */
+        /* Trava de zoom acidental no telemóvel */
         * { touch-action: manipulation; }
         
         [data-testid="stHeader"] { display: none !important; visibility: hidden; }
@@ -247,10 +247,10 @@ def orquestrar_pipeline_carteira():
 PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
 
 try:
-    with st.spinner('Sincronizando custódia com a nuvem...'):
+    with st.spinner('A sincronizar custódia com a nuvem...'):
         df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = orquestrar_pipeline_carteira()
 except Exception as e:
-    st.error("⚠️ Falha ao sincronizar com o banco de dados. Verifique sua conexão.")
+    st.error("⚠️ Falha ao sincronizar com a base de dados. Verifique a sua ligação.")
     st.stop()
 
 total_investido_kpi = 0.0
@@ -374,25 +374,32 @@ with aba_resumo:
             st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação</h3>", unsafe_allow_html=True)
             
             df_sunburst = df_custodia_atual.copy()
-            df_sunburst['Raiz'] = 'Carteira'
             
-            # Paleta de tons azuis e cinzas tranquilos
-            paleta_tranquila = ['#2C3E50', '#118DFF', '#7F8C8D', '#52BE80', '#5DADE2', '#95A5A6', '#A5D6A7']
+            # 🎯 Embutindo o valor total no centro (formatação idêntica à imagem)
+            texto_raiz = f"Carteira<br>{formatar_br(patrimonio_mercado_kpi)}"
+            df_sunburst['Raiz'] = texto_raiz
             
             fig_p = px.sunburst(
                 df_sunburst,
                 path=['Raiz', 'Classificacao', 'Seguimento', 'Ticker'],
-                values='Patrimonio_Mercado_Ativo',
-                color='Classificacao',
-                color_discrete_sequence=paleta_tranquila
+                values='Patrimonio_Mercado_Ativo'
             )
             
-            # 🎯 TRUQUE CIRÚRGICO: Injeta o verde estritamente na fatia "Carteira" do centro
-            if fig_p.data and fig_p.data[0].marker.colors is not None:
-                cores_fatias = list(fig_p.data[0].marker.colors)
-                for i, label in enumerate(fig_p.data[0].labels):
-                    if label == 'Carteira':
-                        cores_fatias[i] = '#1fbc74' # Verde idêntico ao do patrimônio
+            # 🎯 ENGENHARIA DE CORES POR PROFUNDIDADE (Efeito Degradê Monocromático)
+            if fig_p.data and fig_p.data[0].ids is not None:
+                cores_fatias = []
+                for id_str in fig_p.data[0].ids:
+                    # A profundidade é dada pela quantidade de barras (/) no ID da hierarquia
+                    depth = str(id_str).count('/')
+                    if depth == 0:
+                        cores_fatias.append('#264D59') # Nível 0: Centro Escuro (Carteira)
+                    elif depth == 1:
+                        cores_fatias.append('#438292') # Nível 1: Classes (Tijolo, Papel)
+                    elif depth == 2:
+                        cores_fatias.append('#8EBEC9') # Nível 2: Seguimentos (Shopping, Logístico)
+                    else:
+                        cores_fatias.append('#C6E0E5') # Nível 3: Tickers mais claros na borda externa
+                
                 fig_p.update_traces(marker=dict(colors=cores_fatias))
             
             fig_p.update_layout(
@@ -402,6 +409,7 @@ with aba_resumo:
                 dragmode=False
             )
             
+            # Força o percentual no anel externo e o nome da fatia
             fig_p.update_traces(
                 textinfo="label+percent root",
                 hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
