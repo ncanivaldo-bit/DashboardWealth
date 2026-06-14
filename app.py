@@ -374,8 +374,6 @@ with aba_resumo:
             st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação</h3>", unsafe_allow_html=True)
             
             df_sunburst = df_custodia_atual.copy()
-            
-            # 🎯 Embutindo o valor total no centro (formatação idêntica à imagem)
             texto_raiz = f"Carteira<br>{formatar_br(patrimonio_mercado_kpi)}"
             df_sunburst['Raiz'] = texto_raiz
             
@@ -385,20 +383,19 @@ with aba_resumo:
                 values='Patrimonio_Mercado_Ativo'
             )
             
-            # 🎯 ENGENHARIA DE CORES POR PROFUNDIDADE (Efeito Degradê Monocromático)
+            # 🎯 TRUQUE DE ENGENHARIA DE CORES POR PROFUNDIDADE (Esquema Teal idêntico ao original)
             if fig_p.data and fig_p.data[0].ids is not None:
                 cores_fatias = []
                 for id_str in fig_p.data[0].ids:
-                    # A profundidade é dada pela quantidade de barras (/) no ID da hierarquia
                     depth = str(id_str).count('/')
                     if depth == 0:
-                        cores_fatias.append('#264D59') # Nível 0: Centro Escuro (Carteira)
+                        cores_fatias.append('#1D4E5B')  # Nível 0 (Centro): Carteira (Teal Escuro)
                     elif depth == 1:
-                        cores_fatias.append('#438292') # Nível 1: Classes (Tijolo, Papel)
+                        cores_fatias.append('#3A7385')  # Nível 1: Classes de Ativo (Tijolo, Papel)
                     elif depth == 2:
-                        cores_fatias.append('#8EBEC9') # Nível 2: Seguimentos (Shopping, Logístico)
+                        cores_fatias.append('#87B6C4')  # Nível 2: Segmentos (Shopping, Logística)
                     else:
-                        cores_fatias.append('#C6E0E5') # Nível 3: Tickers mais claros na borda externa
+                        cores_fatias.append('#C2E2EB')  # Nível 3 (Borda): Tickers Individuais (Teal Claro)
                 
                 fig_p.update_traces(marker=dict(colors=cores_fatias))
             
@@ -409,7 +406,6 @@ with aba_resumo:
                 dragmode=False
             )
             
-            # Força o percentual no anel externo e o nome da fatia
             fig_p.update_traces(
                 textinfo="label+percent root",
                 hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
