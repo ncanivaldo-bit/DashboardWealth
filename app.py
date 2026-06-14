@@ -376,16 +376,24 @@ with aba_resumo:
             df_sunburst = df_custodia_atual.copy()
             df_sunburst['Raiz'] = 'Carteira'
             
-            # 🎯 AJUSTE DE COR SINTONIZADO: O tom exato de verde ('#1fbc74') assume a primeira posição.
-            # Isso faz com que a fatia central "Carteira" combine diretamente com a linha do Patrimônio Atual.
-            paleta_tranquila = ['#1fbc74', '#2C3E50', '#118DFF', '#7F8C8D', '#52BE80', '#5DADE2', '#95A5A6', '#A5D6A7']
+            # Paleta de tons azuis e cinzas tranquilos
+            paleta_tranquila = ['#2C3E50', '#118DFF', '#7F8C8D', '#52BE80', '#5DADE2', '#95A5A6', '#A5D6A7']
             
             fig_p = px.sunburst(
                 df_sunburst,
                 path=['Raiz', 'Classificacao', 'Seguimento', 'Ticker'],
                 values='Patrimonio_Mercado_Ativo',
+                color='Classificacao',
                 color_discrete_sequence=paleta_tranquila
             )
+            
+            # 🎯 TRUQUE CIRÚRGICO: Injeta o verde estritamente na fatia "Carteira" do centro
+            if fig_p.data and fig_p.data[0].marker.colors is not None:
+                cores_fatias = list(fig_p.data[0].marker.colors)
+                for i, label in enumerate(fig_p.data[0].labels):
+                    if label == 'Carteira':
+                        cores_fatias[i] = '#1fbc74' # Verde idêntico ao do patrimônio
+                fig_p.update_traces(marker=dict(colors=cores_fatias))
             
             fig_p.update_layout(
                 margin=dict(l=10, r=10, t=10, b=10), 
