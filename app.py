@@ -287,7 +287,6 @@ if not df_custodia_atual.empty:
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
-# Abas reestruturadas
 aba_resumo, aba_exposicao, aba_proventos, aba_rebalanceamento = st.tabs([
     "📝 Resumo", "📊 Exposição", "💰 Proventos", "⚖️ Rebalanceamento"
 ])
@@ -506,7 +505,7 @@ with aba_exposicao:
         st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de exposição.")
 
 # ==============================================================================
-# ABA 3: PROVENTOS (KPIs customizados no estilo Resumo)
+# ABA 3: PROVENTOS
 # ==============================================================================
 with aba_proventos:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Módulo de Renda Passiva</h3>", unsafe_allow_html=True)
@@ -515,12 +514,10 @@ with aba_proventos:
     df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
     if not df_prov_detalhe.empty:
-        # Motores de cálculo de renda passiva
         media_mensal_prov = total_dividendos / max(len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique()), 1)
         yoc_medio = (total_dividendos / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
         yield_ultimo_mensal = (ult_provento_val / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
         
-        # 🎯 AJUSTE SOLICITADO: KPIs estilizados via HTML combinando com a aba resumo
         cp1, cp2, cp3 = st.columns(3)
         
         with cp1:
@@ -602,36 +599,38 @@ with aba_proventos:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
 # ==============================================================================
-# ABA 4: REBALANCEAMENTO
+# ABA 4: REBALANCEAMENTO (Reestruturada por Seguimento)
 # ==============================================================================
 with aba_rebalanceamento:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#7F8C8D; font-size:13px; margin-bottom:10px;'>Ajuste as metas percentuais diretamente na tabela abaixo para simular aportes e rebalancear a sua carteira em tempo real.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#7F8C8D; font-size:13px; margin-bottom:10px;'>Ajuste as metas percentuais por <b>Seguimento</b> diretamente na tabela abaixo para simular aportes e rebalancear a sua carteira em tempo real.</p>", unsafe_allow_html=True)
     
     if not df_custodia_atual.empty:
-        df_rebal_base = df_custodia_atual[['Ticker', 'Classificacao', 'Seguimento', 'Patrimonio_Mercado_Ativo']].copy()
+        # 🎯 AJUSTE SOLICITADO: Agrupamento da base de rebalanceamento no nível de SEGUIMENTO
+        df_rebal_base = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
         df_rebal_base['% Atual'] = (df_rebal_base['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
         
+        # Meta padrão uniforme sugerida por setor
         df_rebal_base['Meta (%)'] = 100.0 / len(df_rebal_base)
         
+        # Grade interativa no nível de seguimento
         df_painel_interativo = st.data_editor(
             df_rebal_base,
             column_config={
-                "Ticker": st.column_config.TextColumn("Ativo", disabled=True),
-                "Classificacao": st.column_config.TextColumn("Classe", disabled=True),
                 "Seguimento": st.column_config.TextColumn("Seguimento", disabled=True),
                 "Patrimonio_Mercado_Ativo": st.column_config.NumberColumn("Patrimônio Atual", format="R$ %,.2f", disabled=True),
                 "% Atual": st.column_config.NumberColumn("% Atual", format="%.2f%%", disabled=True),
-                "Meta (%)": st.column_config.NumberColumn("Sua Meta (%)", min_value=0.0, max_value=100.0, format="%.2f%%", help="Altere os valores para recalcular as ações de compra.")
+                "Meta (%)": st.column_config.NumberColumn("Sua Meta (%)", min_value=0.0, max_value=100.0, format="%.2f%%", help="Altere as metas setoriais para recalcular as necessidades de aporte.")
             },
             hide_index=True,
             use_container_width=True
         )
         
+        # Motores de cálculo de desvio patrimonial por setor
         df_painel_interativo['Diferença (R$)'] = ((df_painel_interativo['Meta (%)'] / 100.0) * patrimonio_mercado_kpi) - df_painel_interativo['Patrimonio_Mercado_Ativo']
         
         def processar_sinal(dif):
-            if dif > 50.0:
+            if dif > 50.0:  # Margem de corte de R$ 50 para mitigar ruídos operacionais
                 return "🛒 COMPRAR"
             elif dif < -50.0:
                 return "🛡️ AGUARDAR"
@@ -640,18 +639,19 @@ with aba_rebalanceamento:
                 
         df_painel_interativo['Ação Sugerida'] = df_painel_interativo['Diferença (R$)'].apply(processar_sinal)
         
-        df_exibicao_rebal = df_painel_interativo[['Ticker', 'Patrimonio_Mercado_Ativo', '% Atual', 'Meta (%)', 'Diferença (R$)', 'Ação Sugerida']].copy()
+        df_exibicao_rebal = df_painel_interativo[['Seguimento', 'Patrimonio_Mercado_Ativo', '% Atual', 'Meta (%)', 'Diferença (R$)', 'Ação Sugerida']].copy()
         
+        # Formatação para exibição na grade final do usuário
         df_exibicao_rebal['Patrimônio Atual'] = df_exibicao_rebal['Patrimonio_Mercado_Ativo'].apply(formatar_br)
         df_exibicao_rebal['% Atual'] = df_exibicao_rebal['% Atual'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
         df_exibicao_rebal['Meta (%)'] = df_exibicao_rebal['Meta (%)'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
         df_exibicao_rebal['Diferença Financeira'] = df_exibicao_rebal['Diferença (R$)'].apply(formatar_br)
         
-        st.markdown("<br><h4 style='color:#2C3E50; font-size:16px;'>Diagnóstico de Aportes para o Mês Corrente</h4>", unsafe_allow_html=True)
+        st.markdown("<br><h4 style='color:#2C3E50; font-size:16px;'>Diagnóstico de Aportes por Seguimento para o Mês Corrente</h4>", unsafe_allow_html=True)
         st.dataframe(
-            df_exibicao_rebal[['Ticker', 'Patrimônio Atual', '% Atual', 'Meta (%)', 'Diferença Financeira', 'Ação Sugerida']],
+            df_exibicao_rebal[['Seguimento', 'Patrimônio Atual', '% Atual', 'Meta (%)', 'Diferença Financeira', 'Ação Sugerida']],
             use_container_width=True,
             hide_index=True
         )
     else:
-        st.info("ℹ️ Sem posições ativas em custódia para gerar matriz de rebalanceamento.")
+        st.info("ℹ freezer Sem posições ativas em custódia para gerar matriz de rebalanceamento setorial.")
