@@ -5,6 +5,7 @@ import json
 import io
 import time
 import plotly.graph_objects as go
+import plotly.express as px
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -194,11 +195,7 @@ def orquestrar_pipeline_carteira():
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
         
-        # ======================================================================
-        # 🛡️ CORREÇÃO CIRÚRGICA: ESTICANDO A LINHA DO TEMPO DOS ATIVOS
-        # Isso garante que ativos sem movimentação recente continuem sendo 
-        # somados no resample dos meses seguintes (resolvendo Jan/2025).
-        # ======================================================================
+        # Extensão da linha do tempo para preservar ativos estáticos (Jan/2025)
         data_atual = pd.Timestamp.now().normalize()
         linhas_extensao = []
         for tk in df_hist_ativos['Ticker'].unique():
@@ -210,9 +207,7 @@ def orquestrar_pipeline_carteira():
                 
         df_hist_ext = pd.concat([df_hist_ativos, pd.DataFrame(linhas_extensao)], ignore_index=True)
         df_hist_ext = df_hist_ext.sort_values(by=['Data', 'Ticker'])
-        # ======================================================================
         
-        # Voltei para o seu resample limpo original que funcionava perfeito!
         df_mensal_ativos = (df_hist_ext
                             .set_index('Data')
                             .groupby('Ticker')[['Quantidade', 'Custo_Total']]
@@ -249,7 +244,6 @@ def orquestrar_pipeline_carteira():
 # 5. EXECUÇÃO DA INTERFACE VISUAL
 # ==============================================================================
 
-# Configuração global anti-zoom para os gráficos no celular
 PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
 
 try:
@@ -377,49 +371,27 @@ with aba_resumo:
 
     with col_bloco_direito:
         with st.container(border=True):
-            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Ativos</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação Dinâmica (Explosão)</h3>", unsafe_allow_html=True)
             
-            visao_selecionada = st.radio("Dimensão:", ["Ativos", "Classificação", "Seguimento"], horizontal=True, label_visibility="collapsed")
-            
-            if visao_selecionada == "Ativos":
-                df_rosca = df_custodia_atual.copy()
-                coluna_label = 'Ticker'
-            elif visao_selecionada == "Classificação":
-                df_rosca = df_custodia_atual.groupby('Classificacao', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
-                coluna_label = 'Classificacao'
-            else:
-                df_rosca = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
-                coluna_label = 'Seguimento'
-            
-            df_rosca = df_rosca.sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
-            total_patrimonio_rosca = df_rosca['Patrimonio_Mercado_Ativo'].sum()
-            df_rosca['Percentual'] = (df_rosca['Patrimonio_Mercado_Ativo'] / total_patrimonio_rosca * 100)
-            df_rosca['Label_Legenda'] = df_rosca[coluna_label] + ' - ' + df_rosca['Percentual'].map('{:.1f}%'.format).str.replace('.', ',')
-            
-            fig_p = go.Figure(go.Pie(
-                labels=df_rosca['Label_Legenda'], 
-                values=df_rosca['Patrimonio_Mercado_Ativo'], 
-                hole=0.55, 
-                textinfo='none',
-                domain=dict(x=[0, 0.60]),
-                hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
-            ))
+            # 🎯 SUBSTITUIÇÃO EXCLUSIVA: Gráfico Sunburst Hierárquico Inteligente
+            fig_p = px.sunburst(
+                df_custodia_atual,
+                path=['Classificacao', 'Seguimento', 'Ticker'],
+                values='Patrimonio_Mercado_Ativo',
+                color_discrete_sequence=px.colors.qualitative.Prism
+            )
             
             fig_p.update_layout(
-                margin=dict(l=0, r=0, t=10, b=10), 
-                height=245, 
-                paper_bgcolor='rgba(0,0,0,0)', 
-                showlegend=True, 
-                dragmode=False,
-                legend=dict(
-                    orientation="v", 
-                    yanchor="middle", 
-                    y=0.5, 
-                    xanchor="left", 
-                    x=0.62,
-                    font=dict(size=10)
-                )
+                margin=dict(l=10, r=10, t=10, b=10), 
+                height=315, 
+                paper_bgcolor='rgba(0,0,0,0)',
+                dragmode=False
             )
+            
+            fig_p.update_traces(
+                hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
+            )
+            
             st.plotly_chart(fig_p, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
 # ------------------------------------------------------------------------------
