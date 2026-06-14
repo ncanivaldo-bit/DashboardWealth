@@ -184,8 +184,6 @@ def orquestrar_pipeline_carteira():
         df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%d/%m/%Y', errors='coerce')
 
     df_inf['Preco_Atual'] = pd.to_numeric(df_inf['Preco_Atual'], errors='coerce').fillna(0)
-    
-    # 🎯 CORREÇÃO 1: Mantém os NaNs intactos temporariamente para não quebrar a lógica do ffill adiante
     df_precos_historicos['Preco_Mercado'] = pd.to_numeric(df_precos_historicos['Preco_Mercado'], errors='coerce')
 
     eventos_custodia = ['Compra', 'Venda', 'Desdobro']
@@ -197,7 +195,6 @@ def orquestrar_pipeline_carteira():
     if not df_hist_ativos.empty:
         df_hist_ativos['Data'] = pd.to_datetime(df_hist_ativos['Data'])
         
-        # Extensão de linha do tempo
         data_atual = pd.Timestamp.now().normalize()
         linhas_extensao = []
         for tk in df_hist_ativos['Ticker'].unique():
@@ -224,7 +221,6 @@ def orquestrar_pipeline_carteira():
         
         df_consolidado = pd.merge(df_mensal_ativos, df_precos_historicos, on=['Chave_Merge', 'Ticker'], how='left')
         
-        # 🎯 CORREÇÃO 2: Trata zeros explícitos como NaN para permitir a propagação correta de meses anteriores
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].replace(0, np.nan)
         df_consolidado = df_consolidado.sort_values(by=['Data', 'Ticker'])
         df_consolidado['Preco_Mercado'] = df_consolidado.groupby('Ticker')['Preco_Mercado'].ffill()
@@ -234,7 +230,6 @@ def orquestrar_pipeline_carteira():
         mes_atual_chave = pd.Timestamp.now().strftime('%Y-%m')
         df_consolidado.loc[df_consolidado['Chave_Merge'] == mes_atual_chave, 'Preco_Mercado'] = df_consolidado['Preco_Atual']
         
-        # Fallback para preço médio caso o ativo nunca tenha tido preço histórico registrado
         df_consolidado['Preco_Mercado'] = df_consolidado['Preco_Mercado'].fillna(df_consolidado['Custo_Total'] / df_consolidado['Quantidade']).fillna(0)
         df_consolidado['Patrimonio_Mercado_Ativo'] = df_consolidado['Quantidade'] * df_consolidado['Preco_Mercado']
         
@@ -246,9 +241,9 @@ def orquestrar_pipeline_carteira():
                 df_custodia_atual[col] = 'NÃO INFORMADO'
             df_custodia_atual[col] = df_custodia_atual[col].fillna('NÃO INFORMADO').astype(str).str.upper()
         
-        return df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes
+        return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes
         
-    return pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
+    return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-"
 
 # ==============================================================================
 # 5. EXECUÇÃO DA INTERFACE VISUAL
@@ -258,7 +253,7 @@ PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
 
 try:
     with st.spinner('A sincronizar custódia com a nuvem...'):
-        df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = orquestrar_pipeline_carteira()
+        df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes = orquestrar_pipeline_carteira()
 except Exception as e:
     st.error("⚠️ Falha ao sincronizar com a base de dados. Verifique a sua ligação.")
     st.stop()
@@ -281,17 +276,23 @@ if not df_custodia_atual.empty:
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
-aba_resumo, aba_alocacao = st.tabs(["📝 Resumo", "⚙️ Alocação"])
+# 🎯 CONFIGURAÇÃO DAS ABAS REESTRUTURADAS
+aba_resumo, aba_exposicao, aba_proventos, aba_rebalanceamento = st.tabs([
+    "📝 Resumo", "📊 Exposição", "💰 Proventos", "⚖️ Rebalanceamento"
+])
 
+def formatar_br(v):
+    prefixo = "-" if v < 0 else ""
+    return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    
+def formatar_pct(v):
+    prefixo = "+" if v > 0 else ""
+    return f"{prefixo}{v:.2f}%".replace('.', ',')
+
+# ==============================================================================
+# ABA 1: RESUMO
+# ==============================================================================
 with aba_resumo:
-    def formatar_br(v):
-        prefixo = "-" if v < 0 else ""
-        return f"{prefixo}R$ {abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        
-    def formatar_pct(v):
-        prefixo = "+" if v > 0 else ""
-        return f"{prefixo}{v:.2f}%".replace('.', ',')
-
     color_lucro = "#2E8B57" if lucro_total_kpi >= 0 else "#CD5C5C"
     color_ganho = "#2E8B57" if ganho_capital_kpi >= 0 else "#CD5C5C"
     color_var = "#2E8B57" if variacao_carteira_pct >= 0 else "#CD5C5C"
@@ -425,10 +426,10 @@ with aba_resumo:
             
             st.plotly_chart(fig_p, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
-# ------------------------------------------------------------------------------
-# ⚙️ ABA 2: CENTRAL DE ALOCAÇÃO
-# ------------------------------------------------------------------------------
-with aba_alocacao:
+# ==============================================================================
+# ABA 2: EXPOSIÇÃO (Antiga aba Alocação)
+# ==============================================================================
+with aba_exposicao:
     if not df_custodia_atual.empty:
         df_analise = df_custodia_atual.copy()
 
@@ -498,6 +499,118 @@ with aba_alocacao:
                     yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-
     else:
-        st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de alocação.")
+        st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de exposição.")
+
+# ==============================================================================
+# ABA 3: PROVENTOS (Nova Aba Inteligente)
+# ==============================================================================
+with aba_proventos:
+    st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Módulo de Renda Passiva</h3>", unsafe_allow_html=True)
+    
+    termos_proventos = ['Dividendo', 'JCP', 'Rendimento', 'Provento']
+    df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
+    
+    if not df_prov_detalhe.empty:
+        # Criação de Métricas de Eficiência em Renda
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Total de Proventos Históricos", formatar_br(total_dividendos))
+        with c2:
+            media_mensal_prov = total_dividendos / max(len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique()), 1)
+            st.metric("Média Mensal Recebida", formatar_br(media_mensal_prov))
+        with c3:
+            yoc_medio = (total_dividendos / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
+            st.metric("Yield on Cost Histórico Amortizado", f"{yoc_medio:.2f}%")
+            
+        col_graf_esq, col_graf_dir = st.columns([6, 4])
+        
+        with col_graf_esq:
+            with st.container(border=True):
+                st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Evolução de Caixa Mensal (Proventos)</h4>", unsafe_allow_html=True)
+                df_prov_detalhe['Mes_Ano_Str'] = df_prov_detalhe['Data_Datetime'].dt.strftime('%m/%Y')
+                df_cron_prov = df_prov_detalhe.groupby('Data_Datetime').agg({'Valor_Operacao_Num':'sum'}).resample('ME').sum().reset_index()
+                df_cron_prov['Mês'] = df_cron_prov['Data_Datetime'].dt.strftime('%m/%Y')
+                
+                fig_bar_prov = go.Figure(go.Bar(
+                    x=df_cron_prov['Mês'], y=df_cron_prov['Valor_Operacao_Num'],
+                    marker_color='#2E8B57',
+                    hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                fig_bar_prov.update_layout(margin=dict(l=40, r=10, t=10, b=10), height=260, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
+                st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+                
+        with col_graf_dir:
+            with st.container(border=True):
+                st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Top Pagadores da Carteira (Acumulado)</h4>", unsafe_allow_html=True)
+                df_ranking_ativos = df_prov_detalhe.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True).tail(5)
+                
+                fig_rank = go.Figure(go.Bar(
+                    x=df_ranking_ativos['Valor_Operacao_Num'], y=df_ranking_ativos['Ticker'],
+                    orientation='h', marker_color='#FFD700',
+                    hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
+                ))
+                fig_rank.update_layout(margin=dict(l=55, r=10, t=10, b=10), height=260, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
+                st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+    else:
+        st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
+
+# ==============================================================================
+# ABA 4: REBALANCEAMENTO (Nova Aba Inteligente e Interativa)
+# ==============================================================================
+with aba_rebalanceamento:
+    st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#7F8C8D; font-size:13px; margin-bottom:10px;'>Ajuste as metas percentuais diretamente na tabela abaixo para simular aportes e rebalancear a sua carteira em tempo real.</p>", unsafe_allow_html=True)
+    
+    if not df_custodia_atual.empty:
+        df_rebal_base = df_custodia_atual[['Ticker', 'Classificacao', 'Seguimento', 'Patrimonio_Mercado_Ativo']].copy()
+        df_rebal_base['% Atual'] = (df_rebal_base['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
+        
+        # Define uma meta padrão linear sugerida uniforme (Surpresa de Automação)
+        df_rebal_base['Meta (%)'] = 100.0 / len(df_rebal_base)
+        
+        # Streamlit Data Editor para digitação interativa de metas na tela
+        df_painel_interativo = st.data_editor(
+            df_rebal_base,
+            column_config={
+                "Ticker": st.column_config.TextColumn("Ativo", disabled=True),
+                "Classificacao": st.column_config.TextColumn("Classe", disabled=True),
+                "Seguimento": st.column_config.TextColumn("Seguimento", disabled=True),
+                "Patrimonio_Mercado_Ativo": st.column_config.NumberColumn("Patrimônio Atual", format="R$ %,.2f", disabled=True),
+                "% Atual": st.column_config.NumberColumn("% Atual", format="%.2f%%", disabled=True),
+                "Meta (%)": st.column_config.NumberColumn("Sua Meta (%)", min_value=0.0, max_value=100.0, format="%.2f%%", help="Altere os valores para recalcular as ações de compra.")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+        
+        # Motores de Cálculo de Rebalanceamento em tempo real
+        df_painel_interativo['Diferença (R$)'] = ((df_painel_interativo['Meta (%)'] / 100.0) * patrimonio_mercado_kpi) - df_painel_interativo['Patrimonio_Mercado_Ativo']
+        
+        def processar_sinal(dif):
+            if dif > 50.0:  # Margem de tolerância de R$ 50 para evitar ruídos de ordens fracionárias
+                return "🛒 COMPRAR"
+            elif dif < -50.0:
+                return "🛡️ AGUARDAR"
+            else:
+                return "✅ OK"
+                
+        df_painel_interativo['Ação Sugerida'] = df_painel_interativo['Diferença (R$)'].apply(processar_sinal)
+        
+        # Exibição dos Resultados Consolidados do Rebalanceamento
+        df_exibicao_rebal = df_painel_interativo[['Ticker', 'Patrimonio_Mercado_Ativo', '% Atual', 'Meta (%)', 'Diferença (R$)', 'Ação Sugerida']].copy()
+        
+        # Formatação cosmética final das colunas calculadas para o investidor
+        df_exibicao_rebal['Patrimônio Atual'] = df_exibicao_rebal['Patrimonio_Mercado_Ativo'].apply(formatar_br)
+        df_exibicao_rebal['% Atual'] = df_exibicao_rebal['% Atual'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
+        df_exibicao_rebal['Meta (%)'] = df_exibicao_rebal['Meta (%)'].apply(lambda x: f"{x:.2f}%".replace('.', ','))
+        df_exibicao_rebal['Diferença Financeira'] = df_exibicao_rebal['Diferença (R$)'].apply(formatar_br)
+        
+        st.markdown("<br><h4 style='color:#2C3E50; font-size:16px;'>Diagnóstico de Aportes para o Mês Corrente</h4>", unsafe_allow_html=True)
+        st.dataframe(
+            df_exibicao_rebal[['Ticker', 'Patrimônio Atual', '% Atual', 'Meta (%)', 'Diferença Financeira', 'Ação Sugerida']],
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("ℹ️ Sem posições ativas em custódia para gerar matriz de rebalanceamento.")
