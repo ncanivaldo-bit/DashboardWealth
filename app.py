@@ -737,7 +737,7 @@ with aba_rebalanceamento:
             'Variação': fmt_br_pct_local,
             '% Atual': fmt_br_pct_pure_local,
             'Meta Ideal': fmt_br_pct_pure_local,
-            'Aporte Rec.': lambda x: formatar_br(x) if x > 0 else "R$ 0,00"
+            'Aporte Rec.': formatar_br # <--- AGORA ELE USA A FUNÇÃO PADRÃO
         }).map(color_variacao, subset=['Variação'])
         
         # 🎯 AJUSTE SOLICITADO: Renderização via st.dataframe pura que escala perfeitamente em telas móveis
