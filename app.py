@@ -608,7 +608,7 @@ with aba_proventos:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
 # ==============================================================================
-# ABA 4: REBALANCEAMENTO (Remoção da tabela editável e adição de Filtro Setorial)
+# ABA 4: REBALANCEAMENTO
 # ==============================================================================
 with aba_rebalanceamento:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
@@ -617,7 +617,6 @@ with aba_rebalanceamento:
         df_rebal_seg = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
         df_rebal_seg['% Atual'] = (df_rebal_seg['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
         
-        # Leitura estática e segura dos parâmetros da aba Mtericas/Metricas da sua planilha
         if not df_metricas.empty:
             df_metricas.columns = df_metricas.columns.astype(str).str.strip()
             col_seg = next((c for c in df_metricas.columns if 'seguimento' in c.lower() or 'classe' in c.lower()), df_metricas.columns[0])
@@ -637,7 +636,6 @@ with aba_rebalanceamento:
         else:
             df_rebal_seg['Meta (%)'] = 100.0 / len(df_rebal_seg)
             
-        # 🎯 AJUSTE SOLICITADO: Filtro suspenso dinâmico substituindo a primeira tabela
         lista_seguimentos = sorted(df_custodia_atual['Seguimento'].unique().tolist())
         seg_selecionado = st.selectbox("Selecione o Seguimento para Filtragem:", ["TODOS"] + lista_seguimentos)
         
@@ -652,25 +650,23 @@ with aba_rebalanceamento:
         df_ativos_rebal['Meta_Ativo_Val'] = (df_ativos_rebal['Meta_Ativo_Pct'] / 100.0) * patrimonio_mercado_kpi
         df_ativos_rebal['Diferenca_Val'] = df_ativos_rebal['Meta_Ativo_Val'] - df_ativos_rebal['Patrimonio_Mercado_Ativo']
         
-        # 🎯 AJUSTE SOLICITADO: Regras operacionais atualizadas
-        def processar_acao(row):
-            var = row['Variacao_Pct']
-            abaixo_meta = row['Patrimonio_Mercado_Ativo'] < row['Meta_Ativo_Val']
-            abaixo_pm = row['Preco_Mercado'] <= row['Preco_Medio']
-            
-            if var <= -0.10:
-                return "QUEDA BRUSCA"
-            elif var >= 0.20:
-                return "VENDER"
-            elif abaixo_meta and abaixo_pm:
-                return "🛒 COMPRAR"
-            else:
-                return "🛡️ AGUARDAR"
-
-        df_ativos_rebal['Ação Sugerida'] = df_ativos_rebal.apply(processar_acao, axis=1)
+        # 🎯 AJUSTE DE PERFORMANCE: Lógica Vetorizada (Substitui o .apply e deixa o filtro instantâneo)
+        condicoes = [
+            (df_ativos_rebal['Variacao_Pct'] <= -0.10),
+            (df_ativos_rebal['Variacao_Pct'] >= 0.20),
+            ((df_ativos_rebal['Patrimonio_Mercado_Ativo'] < df_ativos_rebal['Meta_Ativo_Val']) & 
+             (df_ativos_rebal['Preco_Mercado'] <= df_ativos_rebal['Preco_Medio']))
+        ]
+        
+        escolhas = [
+            "QUEDA BRUSCA", 
+            "VENDER", 
+            "🛒 COMPRAR"
+        ]
+        
+        df_ativos_rebal['Ação Sugerida'] = np.select(condicoes, escolhas, default="🛡️ AGUARDAR")
         df_ativos_rebal['% Atual Ativo'] = (df_ativos_rebal['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
         
-        # 🎯 AJUSTE SOLICITADO: Cálculo do valor Investido vs Ideal setorial com base no filtro
         if seg_selecionado == "TODOS":
             patrimonio_seg_atual = patrimonio_mercado_kpi
             patrimonio_seg_ideal = patrimonio_mercado_kpi
@@ -681,7 +677,6 @@ with aba_rebalanceamento:
             patrimonio_seg_ideal = (meta_seg_pct / 100.0) * patrimonio_mercado_kpi
             df_ativos_filtrados = df_ativos_rebal[df_ativos_rebal['Seguimento'] == seg_selecionado].copy()
             
-        # Exibição dos Blocos de Indicadores Setoriais
         col_rebal_kpi1, col_rebal_kpi2, col_rebal_kpi3 = st.columns(3)
         with col_rebal_kpi1:
             st.markdown(f"""
@@ -710,11 +705,9 @@ with aba_rebalanceamento:
             
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Estruturação da tabela final de Auditoria de Ativos
         df_exibicao = df_ativos_filtrados[['Ticker', 'Seguimento', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
         df_exibicao.columns = ['Ativo', 'Seguimento', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Rec.', 'Ação Sugerida']
         
-        # Funções internas para formatação via Styler (mantendo os dados puros em float no DataFrame)
         def fmt_br_pct_local(v):
             v_100 = v * 100
             prefixo = "+" if v_100 > 0 else ""
@@ -723,7 +716,6 @@ with aba_rebalanceamento:
         def fmt_br_pct_pure_local(v):
             return f"{v:.2f}%".replace('.', ',')
             
-        # 🎯 AJUSTE SOLICITADO: Função de coloração condicional de Variação para dispositivos móveis
         def color_variacao(val):
             if val > 0:
                 return 'color: #2E8B57; font-weight: bold;'
@@ -731,16 +723,16 @@ with aba_rebalanceamento:
                 return 'color: #CD5C5C; font-weight: bold;'
             return ''
             
+        # 🎯 AJUSTE DE FORMATAÇÃO: Exibição de valores negativos/positivos na coluna Aporte Rec.
         df_styled = df_exibicao.style.format({
             'Preço Médio': formatar_br,
             'Preço Atual': formatar_br,
             'Variação': fmt_br_pct_local,
             '% Atual': fmt_br_pct_pure_local,
             'Meta Ideal': fmt_br_pct_pure_local,
-            'Aporte Rec.': formatar_br # <--- AGORA ELE USA A FUNÇÃO PADRÃO
+            'Aporte Rec.': formatar_br 
         }).map(color_variacao, subset=['Variação'])
         
-        # 🎯 AJUSTE SOLICITADO: Renderização via st.dataframe pura que escala perfeitamente em telas móveis
         st.dataframe(
             df_styled,
             use_container_width=True,
