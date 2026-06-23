@@ -594,19 +594,29 @@ with aba_proventos:
                     
             with col_graf_dir:
                 with st.container(border=True):
-                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Último Pagamento por Ativo</h4>", unsafe_allow_html=True)
+                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Ranking de Pagadores</h4>", unsafe_allow_html=True)
                     
-                    # 🎯 PEGA SOMENTE O ÚLTIMO PROVENTO PAGO POR CADA ATIVO FILTRADO
-                    df_ultimo_prov = df_prov_detalhe.sort_values('Data_Datetime').groupby('Ticker').tail(1)
-                    df_ranking_ativos = df_ultimo_prov[['Ticker', 'Valor_Operacao_Num']].sort_values(by='Valor_Operacao_Num', ascending=True)
+                    # 🎯 MENU SUSPENSO PARA SUBSTITUIR O "CLIQUE NO GRÁFICO"
+                    meses_disponiveis = df_cron_prov['Mês'].tolist()
+                    mes_selecionado = st.selectbox("Selecione o Mês:", ["Histórico Completo"] + meses_disponiveis[::-1], label_visibility="collapsed")
                     
-                    # 🎯 AJUSTA A ALTURA DO GRÁFICO DINAMICAMENTE PARA NÃO FICAR APERTADO
-                    altura_dinamica = max(300, len(df_ranking_ativos) * 30)
+                    # 🎯 APLICA O FILTRO DE MÊS OU PEGA O ACUMULADO
+                    if mes_selecionado != "Histórico Completo":
+                        df_rank_base = df_prov_detalhe[df_prov_detalhe['Data_Datetime'].dt.strftime('%m/%Y') == mes_selecionado]
+                        titulo_hover = f"Pago em {mes_selecionado}"
+                    else:
+                        df_rank_base = df_prov_detalhe
+                        titulo_hover = "Total Histórico"
+                    
+                    df_ranking_ativos = df_rank_base.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True)
+                    
+                    # 🎯 ALTURA DINÂMICA PARA MOSTRAR TODOS OS ATIVOS SEM ACHATAR
+                    altura_dinamica = max(235, len(df_ranking_ativos) * 28)
                     
                     fig_rank = go.Figure(go.Bar(
                         x=df_ranking_ativos['Valor_Operacao_Num'], y=df_ranking_ativos['Ticker'],
                         orientation='h', marker_color='#FFD700',
-                        hovertemplate='<b>Ativo:</b> %{y}<br><b>Último Pago:</b> R$ %{x:,.2f}<extra></extra>'
+                        hovertemplate=f'<b>Ativo:</b> %{{y}}<br><b>{titulo_hover}:</b> R$ %{{x:,.2f}}<extra></extra>'
                     ))
                     fig_rank.update_layout(margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
                     st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
