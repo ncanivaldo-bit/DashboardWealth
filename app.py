@@ -20,7 +20,7 @@ st.markdown("""
         /* Trava de zoom acidental no telemóvel */
         * { touch-action: manipulation; }
         
-        [data-testid="stHeader"] { display: none !important; visibility: hidden; }
+        /* Ajustes de espaçamento do container principal */
         [data-testid="stMainBlockContainer"] {
             padding-top: 0.8rem !important;
             padding-bottom: 0.8rem !important;
@@ -45,9 +45,17 @@ st.markdown("""
             font-size: 26px !important; 
             font-weight: 700 !important;
         }
-        #MainMenu { visibility: hidden; }
-        footer { visibility: hidden; }
-        header { visibility: hidden; }
+        
+        /* =======================================================
+           OCULTAR ELEMENTOS NATIVOS E MARCAS DO STREAMLIT
+           ======================================================= */
+        #MainMenu { visibility: hidden !important; display: none !important; }
+        footer { visibility: hidden !important; display: none !important; }
+        header { visibility: hidden !important; display: none !important; }
+        [data-testid="stHeader"] { visibility: hidden !important; display: none !important; }
+        [data-testid="stToolbar"] { visibility: hidden !important; display: none !important; }
+        [data-testid="stDecoration"] { visibility: hidden !important; display: none !important; }
+        [data-testid="stStatusWidget"] { visibility: hidden !important; display: none !important; }
         .stDeployButton { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -321,7 +329,6 @@ with aba_resumo:
     
     col1, col2, col3, col4 = st.columns(4)
     
-    # 🎯 CORREÇÃO: Cores CSS nativas do Streamlit (var(--text-color), var(--secondary-background-color)) e espaçamento bottom.
     with col1:
         st.markdown(f"""
             <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
@@ -471,7 +478,6 @@ with aba_resumo:
                         dragmode=False
                     )
                     
-                    # Fundo do treemap ajustado para não quebrar no modo escuro
                     fig_tree_gest.update_traces(
                         textinfo="label+percent parent",
                         hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>',
@@ -549,7 +555,6 @@ with aba_proventos:
             
             cp1, cp2, cp3 = st.columns(3)
             
-            # 🎯 CORREÇÃO DE CORES E ESPAÇAMENTO
             with cp1:
                 st.markdown(f"""
                     <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
@@ -573,198 +578,4 @@ with aba_proventos:
                     <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
                         <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Total Histórico Filtrado</span>
                         <div style="color: var(--text-color); font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(tot_div_filtrado)}</div>
-                        <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
-                            <div>
-                                <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Yield on Cost Médio:</span>
-                                <strong style="color: #118DFF;">{yoc_medio:.2f}% Amort.</strong>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            with cp3:
-                st.markdown(f"""
-                    <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
-                        <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Média Mensal de Caixa</span>
-                        <div style="color: var(--text-color); font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(media_mensal_prov)}</div>
-                        <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
-                            <div>
-                                <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Meses com Histórico:</span>
-                                <strong style="color: var(--text-color); opacity: 0.9;">{len(proventos_por_mes)} meses</strong>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
-                
-            col_graf_esq, col_graf_dir = st.columns([6, 4])
-            
-            with col_graf_esq:
-                with st.container(border=True, height=380):
-                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:var(--text-color);'>Evolução de Caixa Mensal (Proventos)</h4>", unsafe_allow_html=True)
-                    df_cron_prov = df_prov_detalhe.groupby('Data_Datetime').agg({'Valor_Operacao_Num':'sum'}).resample('ME').sum().reset_index()
-                    df_cron_prov['Mês'] = df_cron_prov['Data_Datetime'].dt.strftime('%m/%Y')
-                    
-                    fig_bar_prov = go.Figure(go.Bar(
-                        x=df_cron_prov['Mês'], y=df_cron_prov['Valor_Operacao_Num'],
-                        marker_color='#2E8B57',
-                        hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
-                    ))
-                    fig_bar_prov.update_layout(separators=",.", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.2f"))
-                    st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-                    
-            with col_graf_dir:
-                with st.container(border=True, height=380):
-                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:var(--text-color);'>Ranking Histórico de Pagadores</h4>", unsafe_allow_html=True)
-                    
-                    df_ranking_ativos = df_prov_detalhe.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True)
-                    
-                    altura_dinamica = max(280, len(df_ranking_ativos) * 35)
-                    
-                    fig_rank = go.Figure(go.Bar(
-                        x=df_ranking_ativos['Valor_Operacao_Num'], y=df_ranking_ativos['Ticker'],
-                        orientation='h', marker_color='#FFD700',
-                        hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
-                    ))
-                    fig_rank.update_layout(separators=",.", margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.2f"))
-                    st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-        else:
-            st.warning("⚠️ Nenhum provento encontrado para a combinação de filtros selecionada.")
-    else:
-        st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
-
-# ==============================================================================
-# ABA 3: REBALANCEAMENTO
-# ==============================================================================
-with aba_rebalanceamento:
-    st.markdown("<h3 style='margin:0; padding-top:4px; color:var(--text-color); font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
-    
-    if not df_custodia_atual.empty:
-        df_rebal_seg = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
-        df_rebal_seg['% Atual'] = (df_rebal_seg['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
-        
-        if not df_metricas.empty:
-            df_metricas.columns = df_metricas.columns.astype(str).str.strip()
-            col_seg = next((c for c in df_metricas.columns if 'seguimento' in c.lower() or 'classe' in c.lower()), df_metricas.columns[0])
-            col_meta = next((c for c in df_metricas.columns if 'meta' in c.lower() or '%' in c.lower()), df_metricas.columns[1])
-            
-            dict_metas = {}
-            for _, row in df_metricas.iterrows():
-                k = str(row[col_seg]).strip().upper()
-                v = str(row[col_meta]).replace(',', '.').replace('%', '').strip()
-                try:
-                    val = float(v)
-                    if val < 1.5 and val > 0: val = val * 100 
-                    dict_metas[k] = val
-                except:
-                    pass
-            df_rebal_seg['Meta (%)'] = df_rebal_seg['Seguimento'].map(dict_metas).fillna(0.0)
-        else:
-            df_rebal_seg['Meta (%)'] = 100.0 / len(df_rebal_seg)
-            
-        lista_seguimentos = sorted(df_custodia_atual['Seguimento'].unique().tolist())
-        seg_selecionado = st.selectbox("Selecione o Seguimento para Filtragem:", ["TODOS"] + lista_seguimentos)
-        
-        df_ativos_rebal = df_custodia_atual.copy()
-        df_ativos_rebal['Preco_Medio'] = np.where(df_ativos_rebal['Quantidade'] > 0, df_ativos_rebal['Custo_Total'] / df_ativos_rebal['Quantidade'], 0)
-        df_ativos_rebal['Variacao_Pct'] = np.where(df_ativos_rebal['Preco_Medio'] > 0, (df_ativos_rebal['Preco_Mercado'] / df_ativos_rebal['Preco_Medio']) - 1, 0)
-        
-        df_ativos_rebal = df_ativos_rebal.merge(df_rebal_seg[['Seguimento', 'Meta (%)']], on='Seguimento', how='left')
-        
-        df_ativos_rebal['Qtd_Ativos_Seg'] = df_ativos_rebal.groupby('Seguimento')['Ticker'].transform('count')
-        df_ativos_rebal['Meta_Ativo_Pct'] = df_ativos_rebal['Meta (%)'] / df_ativos_rebal['Qtd_Ativos_Seg']
-        df_ativos_rebal['Meta_Ativo_Val'] = (df_ativos_rebal['Meta_Ativo_Pct'] / 100.0) * patrimonio_mercado_kpi
-        df_ativos_rebal['Diferenca_Val'] = df_ativos_rebal['Meta_Ativo_Val'] - df_ativos_rebal['Patrimonio_Mercado_Ativo']
-        
-        condicoes = [
-            (df_ativos_rebal['Variacao_Pct'] <= -0.10),
-            (df_ativos_rebal['Variacao_Pct'] >= 0.20),
-            ((df_ativos_rebal['Patrimonio_Mercado_Ativo'] < df_ativos_rebal['Meta_Ativo_Val']) & 
-             (df_ativos_rebal['Preco_Mercado'] <= df_ativos_rebal['Preco_Medio']))
-        ]
-        
-        escolhas = [
-            "QUEDA BRUSCA", 
-            "VENDER", 
-            "🛒 COMPRAR"
-        ]
-        
-        df_ativos_rebal['Ação Sugerida'] = np.select(condicoes, escolhas, default="🛡️ AGUARDAR")
-        df_ativos_rebal['% Atual Ativo'] = (df_ativos_rebal['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
-        
-        if seg_selecionado == "TODOS":
-            patrimonio_seg_atual = patrimonio_mercado_kpi
-            patrimonio_seg_ideal = patrimonio_mercado_kpi
-            df_ativos_filtrados = df_ativos_rebal.copy()
-        else:
-            patrimonio_seg_atual = df_rebal_seg[df_rebal_seg['Seguimento'] == seg_selecionado]['Patrimonio_Mercado_Ativo'].sum()
-            meta_seg_pct = df_rebal_seg[df_rebal_seg['Seguimento'] == seg_selecionado]['Meta (%)'].sum()
-            patrimonio_seg_ideal = (meta_seg_pct / 100.0) * patrimonio_mercado_kpi
-            df_ativos_filtrados = df_ativos_rebal[df_ativos_rebal['Seguimento'] == seg_selecionado].copy()
-            
-        col_rebal_kpi1, col_rebal_kpi2, col_rebal_kpi3 = st.columns(3)
-        with col_rebal_kpi1:
-            st.markdown(f"""
-                <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 90px; max-height: 90px; margin-bottom: 15px;">
-                    <span style="color: var(--text-color); font-size: 13px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Patrimônio Atual ({seg_selecionado})</span>
-                    <div style="color: var(--text-color); font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(patrimonio_seg_atual)}</div>
-                </div>
-            """, unsafe_allow_html=True)
-        with col_rebal_kpi2:
-            st.markdown(f"""
-                <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 90px; max-height: 90px; margin-bottom: 15px;">
-                    <span style="color: var(--text-color); font-size: 13px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Patrimônio Ideal ({seg_selecionado})</span>
-                    <div style="color: #118DFF; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(patrimonio_seg_ideal)}</div>
-                </div>
-            """, unsafe_allow_html=True)
-        with col_rebal_kpi3:
-            diferenca_seg = patrimonio_seg_ideal - patrimonio_seg_atual
-            cor_dif_seg = "#2E8B57" if diferenca_seg > 0 else "#CD5C5C"
-            txt_dif_seg = "Falta Aportar" if diferenca_seg > 0 else "Excedido"
-            st.markdown(f"""
-                <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 90px; max-height: 90px; margin-bottom: 15px;">
-                    <span style="color: var(--text-color); font-size: 13px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Diferença ({txt_dif_seg})</span>
-                    <div style="color: {cor_dif_seg}; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(abs(diferenca_seg))}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        df_exibicao = df_ativos_filtrados[['Ticker', 'Seguimento', 'Quantidade', 'Custo_Total', 'Patrimonio_Mercado_Ativo', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
-        df_exibicao.columns = ['Ativo', 'Seguimento', 'Qtd', 'Investido', 'Saldo Atual', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Rec.', 'Ação Sugerida']
-        
-        def fmt_br_pct_local(v):
-            v_100 = v * 100
-            prefixo = "+" if v_100 > 0 else ""
-            return f"{prefixo}{v_100:.2f}%".replace('.', ',')
-            
-        def fmt_br_pct_pure_local(v):
-            return f"{v:.2f}%".replace('.', ',')
-            
-        def color_variacao(val):
-            if val > 0:
-                return 'color: #2E8B57; font-weight: bold;'
-            elif val < 0:
-                return 'color: #CD5C5C; font-weight: bold;'
-            return ''
-            
-        df_styled = df_exibicao.style.format({
-            'Qtd': formatar_qtd,
-            'Investido': formatar_br,
-            'Saldo Atual': formatar_br,
-            'Preço Médio': formatar_br,
-            'Preço Atual': formatar_br,
-            'Variação': fmt_br_pct_local,
-            '% Atual': fmt_br_pct_pure_local,
-            'Meta Ideal': fmt_br_pct_pure_local,
-            'Aporte Rec.': formatar_br 
-        }).map(color_variacao, subset=['Variação'])
-        
-        st.dataframe(
-            df_styled,
-            use_container_width=True,
-            hide_index=True
-        )
-    else:
-        st.info("ℹ️ Sem posições ativas em custódia para gerar matriz de rebalanceamento.")
+                        <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display
