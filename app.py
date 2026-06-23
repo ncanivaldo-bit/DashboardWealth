@@ -321,18 +321,19 @@ with aba_resumo:
     
     col1, col2, col3, col4 = st.columns(4)
     
+    # 🎯 CORREÇÃO: Cores CSS nativas do Streamlit (var(--text-color), var(--secondary-background-color)) e espaçamento bottom.
     with col1:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual</span>
-                <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+            <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
+                <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Patrimônio Atual</span>
+                <div style="color: var(--text-color); font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(patrimonio_mercado_kpi)}</div>
+                <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Investido:</span>
+                        <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Investido:</span>
                         <strong style="color: #118DFF;">{formatar_br(total_investido_kpi)}</strong>
                     </div>
                     <div style="text-align: right;">
-                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Var:</span>
+                        <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Var:</span>
                         <strong style="color: {color_var};">{formatar_pct(variacao_carteira_pct)}</strong>
                     </div>
                 </div>
@@ -341,16 +342,16 @@ with aba_resumo:
         
     with col2:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Lucro total</span>
-                <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(lucro_total_kpi)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+            <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
+                <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Lucro total</span>
+                <div style="color: var(--text-color); font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(lucro_total_kpi)}</div>
+                <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">G. Cap:</span>
+                        <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">G. Cap:</span>
                         <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong>
                     </div>
                     <div style="text-align: right;">
-                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Prov:</span>
+                        <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Prov:</span>
                         <strong style="color: #2E8B57;">{formatar_br(total_dividendos)}</strong>
                     </div>
                 </div>
@@ -359,13 +360,13 @@ with aba_resumo:
         
     with col3:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Último Provento Mensal</span>
+            <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
+                <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Último Provento Mensal</span>
                 <div style="color: #2E8B57; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(ult_provento_val)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Mês de Ref:</span>
-                        <strong style="color: #34495E;">{ult_provento_mes}</strong>
+                        <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Mês de Ref:</span>
+                        <strong style="color: var(--text-color); opacity: 0.9;">{ult_provento_mes}</strong>
                     </div>
                 </div>
             </div>
@@ -373,24 +374,24 @@ with aba_resumo:
         
     with col4:
         st.markdown(f"""
-            <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Rentabilidade Total</span>
+            <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
+                <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Rentabilidade Total</span>
                 <div style="color: {color_rent}; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_pct(rentabilidade_total_pct)}</div>
-                <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
                     <div>
-                        <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Resultado Com:</span>
+                        <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Resultado Com:</span>
                         <strong style="color: {color_ganho};">{formatar_br(ganho_capital_kpi)}</strong>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown('<div style="margin-top: -24px;">', unsafe_allow_html=True)
+    st.markdown('<div style="margin-top: -15px;">', unsafe_allow_html=True)
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
     with col_bloco_esquerdo:
         with st.container(border=True):
-            st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin:0; padding-top:4px; color:var(--text-color); font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
             df_totais_mensais = df_consolidado.groupby('Mes_Ano').agg({'Custo_Total':'sum', 'Patrimonio_Mercado_Ativo':'sum'}).reset_index()
             df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
             
@@ -398,8 +399,7 @@ with aba_resumo:
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Patrimonio_Mercado_Ativo'], mode='lines+markers', name='Patrimônio Atual', line=dict(color='#1fbc74', width=3), marker=dict(size=6), fill='tozeroy', fillcolor='rgba(31, 188, 116, 0.06)'))
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Custo_Total'], mode='lines', name='Total Investido', line=dict(color='#118DFF', width=2, dash='dot')))
             
-            # 🎯 Correção: separators=",."
-            fig_linhas.update_layout(separators=",.", margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.0f", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
+            fig_linhas.update_layout(separators=",.", margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.0f", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
             st.plotly_chart(fig_linhas, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
     with col_bloco_direito:
@@ -436,7 +436,6 @@ with aba_resumo:
                         line=dict(color='#1D4E5B', width=1.5)
                     ))
                 
-                # 🎯 Correção: separators=",."
                 fig_p.update_layout(
                     separators=",.",
                     margin=dict(l=10, r=10, t=10, b=10), 
@@ -464,7 +463,6 @@ with aba_resumo:
                         color_discrete_sequence=['#3A7385', '#118DFF', '#87B6C4', '#1D4E5B', '#C2E2EB']
                     )
                     
-                    # 🎯 Correção: separators=",."
                     fig_tree_gest.update_layout(
                         separators=",.",
                         margin=dict(l=0, r=0, t=20, b=0), 
@@ -473,11 +471,12 @@ with aba_resumo:
                         dragmode=False
                     )
                     
+                    # Fundo do treemap ajustado para não quebrar no modo escuro
                     fig_tree_gest.update_traces(
                         textinfo="label+percent parent",
                         hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>',
                         marker=dict(line=dict(width=1, color='#FFFFFF')),
-                        root_color="#F8F9FA"
+                        root_color="rgba(0,0,0,0)"
                     )
                     
                     st.plotly_chart(fig_tree_gest, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
@@ -550,19 +549,20 @@ with aba_proventos:
             
             cp1, cp2, cp3 = st.columns(3)
             
+            # 🎯 CORREÇÃO DE CORES E ESPAÇAMENTO
             with cp1:
                 st.markdown(f"""
-                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                        <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Último Provento Recebido</span>
+                    <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
+                        <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Último Provento Recebido</span>
                         <div style="color: #2E8B57; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(ult_prov_val_filt)}</div>
-                        <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
                             <div>
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Rep. na Categoria:</span>
+                                <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Rep. na Categoria:</span>
                                 <strong style="color: #2E8B57;">{yield_ultimo_mensal:.2f}%</strong>
                             </div>
                             <div style="text-align: right;">
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Ref:</span>
-                                <strong style="color: #34495E;">{ult_prov_mes_filt}</strong>
+                                <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Ref:</span>
+                                <strong style="color: var(--text-color); opacity: 0.9;">{ult_prov_mes_filt}</strong>
                             </div>
                         </div>
                     </div>
@@ -570,12 +570,12 @@ with aba_proventos:
                 
             with cp2:
                 st.markdown(f"""
-                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                        <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Total Histórico Filtrado</span>
-                        <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(tot_div_filtrado)}</div>
-                        <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                    <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
+                        <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Total Histórico Filtrado</span>
+                        <div style="color: var(--text-color); font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(tot_div_filtrado)}</div>
+                        <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
                             <div>
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Yield on Cost Médio:</span>
+                                <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Yield on Cost Médio:</span>
                                 <strong style="color: #118DFF;">{yoc_medio:.2f}% Amort.</strong>
                             </div>
                         </div>
@@ -584,13 +584,13 @@ with aba_proventos:
                 
             with cp3:
                 st.markdown(f"""
-                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                        <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Média Mensal de Caixa</span>
-                        <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(media_mensal_prov)}</div>
-                        <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                    <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 110px; max-height: 110px; margin-bottom: 15px;">
+                        <span style="color: var(--text-color); font-size: 14px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Média Mensal de Caixa</span>
+                        <div style="color: var(--text-color); font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(media_mensal_prov)}</div>
+                        <div style="border-top: 1px solid rgba(128,128,128,0.2); padding-top: 4px; font-size: 13px; display: flex; justify-content: space-between;">
                             <div>
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Meses com Histórico:</span>
-                                <strong style="color: #34495E;">{len(proventos_por_mes)} meses</strong>
+                                <span style="font-size: 12px; color: var(--text-color); opacity: 0.6; text-transform: uppercase;">Meses com Histórico:</span>
+                                <strong style="color: var(--text-color); opacity: 0.9;">{len(proventos_por_mes)} meses</strong>
                             </div>
                         </div>
                     </div>
@@ -602,7 +602,7 @@ with aba_proventos:
             
             with col_graf_esq:
                 with st.container(border=True, height=380):
-                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Evolução de Caixa Mensal (Proventos)</h4>", unsafe_allow_html=True)
+                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:var(--text-color);'>Evolução de Caixa Mensal (Proventos)</h4>", unsafe_allow_html=True)
                     df_cron_prov = df_prov_detalhe.groupby('Data_Datetime').agg({'Valor_Operacao_Num':'sum'}).resample('ME').sum().reset_index()
                     df_cron_prov['Mês'] = df_cron_prov['Data_Datetime'].dt.strftime('%m/%Y')
                     
@@ -611,13 +611,12 @@ with aba_proventos:
                         marker_color='#2E8B57',
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    # 🎯 Correção: separators=",."
-                    fig_bar_prov.update_layout(separators=",.", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
+                    fig_bar_prov.update_layout(separators=",.", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.2f"))
                     st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
                     
             with col_graf_dir:
                 with st.container(border=True, height=380):
-                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Ranking Histórico de Pagadores</h4>", unsafe_allow_html=True)
+                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:var(--text-color);'>Ranking Histórico de Pagadores</h4>", unsafe_allow_html=True)
                     
                     df_ranking_ativos = df_prov_detalhe.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True)
                     
@@ -628,8 +627,7 @@ with aba_proventos:
                         orientation='h', marker_color='#FFD700',
                         hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
                     ))
-                    # 🎯 Correção: separators=",."
-                    fig_rank.update_layout(separators=",.", margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
+                    fig_rank.update_layout(separators=",.", margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.2f"))
                     st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
         else:
             st.warning("⚠️ Nenhum provento encontrado para a combinação de filtros selecionada.")
@@ -640,7 +638,7 @@ with aba_proventos:
 # ABA 3: REBALANCEAMENTO
 # ==============================================================================
 with aba_rebalanceamento:
-    st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin:0; padding-top:4px; color:var(--text-color); font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
     
     if not df_custodia_atual.empty:
         df_rebal_seg = df_custodia_atual.groupby('Seguimento', as_index=False)['Patrimonio_Mercado_Ativo'].sum()
@@ -708,15 +706,15 @@ with aba_rebalanceamento:
         col_rebal_kpi1, col_rebal_kpi2, col_rebal_kpi3 = st.columns(3)
         with col_rebal_kpi1:
             st.markdown(f"""
-                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 90px; max-height: 90px;">
-                    <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Patrimônio Atual ({seg_selecionado})</span>
-                    <div style="color: #2C3E50; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(patrimonio_seg_atual)}</div>
+                <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 90px; max-height: 90px; margin-bottom: 15px;">
+                    <span style="color: var(--text-color); font-size: 13px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Patrimônio Atual ({seg_selecionado})</span>
+                    <div style="color: var(--text-color); font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(patrimonio_seg_atual)}</div>
                 </div>
             """, unsafe_allow_html=True)
         with col_rebal_kpi2:
             st.markdown(f"""
-                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 90px; max-height: 90px;">
-                    <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Patrimônio Ideal ({seg_selecionado})</span>
+                <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 90px; max-height: 90px; margin-bottom: 15px;">
+                    <span style="color: var(--text-color); font-size: 13px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Patrimônio Ideal ({seg_selecionado})</span>
                     <div style="color: #118DFF; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(patrimonio_seg_ideal)}</div>
                 </div>
             """, unsafe_allow_html=True)
@@ -725,8 +723,8 @@ with aba_rebalanceamento:
             cor_dif_seg = "#2E8B57" if diferenca_seg > 0 else "#CD5C5C"
             txt_dif_seg = "Falta Aportar" if diferenca_seg > 0 else "Excedido"
             st.markdown(f"""
-                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 90px; max-height: 90px;">
-                    <span style="color: #5D6D7E; font-size: 13px; font-weight: bold; text-transform: uppercase;">Diferença ({txt_dif_seg})</span>
+                <div style="border: 1px solid rgba(128,128,128,0.2); border-radius: 8px; padding: 10px; background-color: var(--secondary-background-color); box-shadow: 1px 1px 3px rgba(0,0,0,0.05); min-height: 90px; max-height: 90px; margin-bottom: 15px;">
+                    <span style="color: var(--text-color); font-size: 13px; font-weight: bold; text-transform: uppercase; opacity: 0.8;">Diferença ({txt_dif_seg})</span>
                     <div style="color: {cor_dif_seg}; font-size: 24px; font-weight: 700; margin-top: 1px;">{formatar_br(abs(diferenca_seg))}</div>
                 </div>
             """, unsafe_allow_html=True)
