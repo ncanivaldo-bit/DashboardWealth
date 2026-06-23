@@ -165,6 +165,16 @@ def formatar_pct(v):
     prefixo = "+" if v > 0 else ""
     return f"{prefixo}{v:.2f}%".replace('.', ',')
 
+def formatar_qtd(v):
+    try:
+        val = float(v)
+        if val.is_integer():
+            return f"{int(val):,}".replace(',', '.')
+        else:
+            return f"{val:,.4f}".rstrip('0').rstrip('.').replace('.', 'X').replace(',', '.').replace('X', ',')
+    except:
+        return v
+
 # ==============================================================================
 # 5. ORQUESTRAÇÃO DE DADOS (CACHEADA)
 # ==============================================================================
@@ -388,7 +398,7 @@ with aba_resumo:
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Patrimonio_Mercado_Ativo'], mode='lines+markers', name='Patrimônio Atual', line=dict(color='#1fbc74', width=3), marker=dict(size=6), fill='tozeroy', fillcolor='rgba(31, 188, 116, 0.06)'))
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Custo_Total'], mode='lines', name='Total Investido', line=dict(color='#118DFF', width=2, dash='dot')))
             
-            fig_linhas.update_layout(margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
+            fig_linhas.update_layout(separators=".,", margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.0f", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
             st.plotly_chart(fig_linhas, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
     with col_bloco_direito:
@@ -426,6 +436,7 @@ with aba_resumo:
                     ))
                 
                 fig_p.update_layout(
+                    separators=".,",
                     margin=dict(l=10, r=10, t=10, b=10), 
                     height=295, 
                     paper_bgcolor='rgba(0,0,0,0)',
@@ -452,6 +463,7 @@ with aba_resumo:
                     )
                     
                     fig_tree_gest.update_layout(
+                        separators=".,",
                         margin=dict(l=0, r=0, t=20, b=0), 
                         height=295, 
                         paper_bgcolor='rgba(0,0,0,0)',
@@ -479,7 +491,6 @@ with aba_proventos:
     df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
     if not df_prov_detalhe.empty:
-        # 🎯 Mapeia Classificação e Seguimento de forma segura
         for col_alvo in ['Classificacao', 'Seguimento']:
             if not df_inf.empty and col_alvo in df_inf.columns:
                 dict_map = df_inf.drop_duplicates('Ticker').set_index('Ticker')[col_alvo].to_dict()
@@ -487,7 +498,6 @@ with aba_proventos:
             else:
                 df_prov_detalhe[col_alvo] = 'NÃO INFORMADO'
         
-        # Cria a coluna de Mês para filtro
         df_prov_detalhe['Mes_Ano_Str'] = df_prov_detalhe['Data_Datetime'].dt.strftime('%m/%Y')
 
         # 🎯 FILTROS CASCATA ALINHADOS NO TOPO DA ABA
@@ -515,12 +525,10 @@ with aba_proventos:
             lista_mes = ["TODOS"] + lista_meses
             filtro_mes = st.selectbox("Mês:", lista_mes)
             
-        # Filtro final aplicado
         df_prov_detalhe = df_f3 if filtro_mes == "TODOS" else df_f3[df_f3['Mes_Ano_Str'] == filtro_mes]
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Se sobrar algum dado após o filtro, renderiza a tela
         if not df_prov_detalhe.empty:
             df_prov_detalhe['AnoMes'] = df_prov_detalhe['Data_Datetime'].dt.to_period('M')
             proventos_por_mes = df_prov_detalhe.groupby('AnoMes')['Valor_Operacao_Num'].sum().sort_index()
@@ -585,13 +593,11 @@ with aba_proventos:
                     </div>
                 """, unsafe_allow_html=True)
                 
-            # 🎯 ESPAÇAMENTO ENTRE KPIs E GRÁFICOS
             st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
                 
             col_graf_esq, col_graf_dir = st.columns([6, 4])
             
             with col_graf_esq:
-                # 🎯 CAIXA COM ALTURA ESTÁTICA FIXA (380px)
                 with st.container(border=True, height=380):
                     st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Evolução de Caixa Mensal (Proventos)</h4>", unsafe_allow_html=True)
                     df_cron_prov = df_prov_detalhe.groupby('Data_Datetime').agg({'Valor_Operacao_Num':'sum'}).resample('ME').sum().reset_index()
@@ -602,17 +608,15 @@ with aba_proventos:
                         marker_color='#2E8B57',
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    fig_bar_prov.update_layout(margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
+                    fig_bar_prov.update_layout(separators=".,", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
                     st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
                     
             with col_graf_dir:
-                # 🎯 CAIXA COM ALTURA ESTÁTICA (380px) QUE GERA SCROLL SE NECESSÁRIO
                 with st.container(border=True, height=380):
                     st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Ranking Histórico de Pagadores</h4>", unsafe_allow_html=True)
                     
                     df_ranking_ativos = df_prov_detalhe.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True)
                     
-                    # 🎯 CÁLCULO DE ALTURA DINÂMICA DENTRO DA CAIXA FIXA (Garante o scroll interno)
                     altura_dinamica = max(280, len(df_ranking_ativos) * 35)
                     
                     fig_rank = go.Figure(go.Bar(
@@ -620,7 +624,7 @@ with aba_proventos:
                         orientation='h', marker_color='#FFD700',
                         hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
                     ))
-                    fig_rank.update_layout(margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
+                    fig_rank.update_layout(separators=".,", margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
                     st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
         else:
             st.warning("⚠️ Nenhum provento encontrado para a combinação de filtros selecionada.")
@@ -724,8 +728,9 @@ with aba_rebalanceamento:
             
         st.markdown("<br>", unsafe_allow_html=True)
         
-        df_exibicao = df_ativos_filtrados[['Ticker', 'Seguimento', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
-        df_exibicao.columns = ['Ativo', 'Seguimento', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Rec.', 'Ação Sugerida']
+        # 🎯 ADIÇÃO DAS NOVAS COLUNAS NA TABELA DE REBALANCEAMENTO
+        df_exibicao = df_ativos_filtrados[['Ticker', 'Seguimento', 'Quantidade', 'Custo_Total', 'Patrimonio_Mercado_Ativo', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
+        df_exibicao.columns = ['Ativo', 'Seguimento', 'Qtd', 'Investido', 'Saldo Atual', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Rec.', 'Ação Sugerida']
         
         def fmt_br_pct_local(v):
             v_100 = v * 100
@@ -743,6 +748,9 @@ with aba_rebalanceamento:
             return ''
             
         df_styled = df_exibicao.style.format({
+            'Qtd': formatar_qtd,
+            'Investido': formatar_br,
+            'Saldo Atual': formatar_br,
             'Preço Médio': formatar_br,
             'Preço Atual': formatar_br,
             'Variação': fmt_br_pct_local,
