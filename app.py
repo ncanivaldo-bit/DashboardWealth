@@ -296,12 +296,13 @@ if not df_custodia_atual.empty:
         variacao_carteira_pct = (patrimonio_mercado_kpi / total_investido_kpi - 1) * 100
         rentabilidade_total_pct = ((patrimonio_mercado_kpi + total_dividendos) / total_investido_kpi - 1) * 100
 
-aba_resumo, aba_exposicao, aba_proventos, aba_rebalanceamento = st.tabs([
-    "📝 Resumo", "📊 Exposição", "💰 Proventos", "⚖️ Rebalanceamento"
+# 🎯 MENU ENXUTO: Apenas 3 abas essenciais
+aba_resumo, aba_proventos, aba_rebalanceamento = st.tabs([
+    "📝 Resumo", "💰 Proventos", "⚖️ Rebalanceamento"
 ])
 
 # ==============================================================================
-# ABA 1: RESUMO
+# ABA 1: RESUMO (Agora agregando a visão de Gestoras)
 # ==============================================================================
 with aba_resumo:
     color_lucro = "#2E8B57" if lucro_total_kpi >= 0 else "#CD5C5C"
@@ -393,110 +394,48 @@ with aba_resumo:
 
     with col_bloco_direito:
         with st.container(border=True):
-            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin:0; padding-top:4px; padding-bottom:5px; color:#2C3E50; font-size:19px; font-weight:600;'>Alocação de Risco</h3>", unsafe_allow_html=True)
             
-            df_sunburst = df_custodia_atual.copy()
-            texto_raiz = f"Carteira<br>{formatar_br(patrimonio_mercado_kpi)}"
-            df_sunburst['Raiz'] = texto_raiz
-            
-            fig_p = px.sunburst(
-                df_sunburst,
-                path=['Raiz', 'Classificacao', 'Seguimento', 'Ticker'],
-                values='Patrimonio_Mercado_Ativo'
+            # 🎯 NOVA CAMADA BI-MODAL: Alterna a visualização do card de forma fluida
+            visao_alocacao = st.radio(
+                "Selecione o corte de risco:",
+                options=["🍩 Por Ativos", "🏢 Por Gestora"],
+                horizontal=True,
+                label_visibility="collapsed"
             )
             
-            if fig_p.data and fig_p.data[0].ids is not None:
-                cores_fatias = []
-                for id_str in fig_p.data[0].ids:
-                    depth = str(id_str).count('/')
-                    if depth == 0:
-                        cores_fatias.append('#1D4E5B')
-                    elif depth == 1:
-                        cores_fatias.append('#3A7385')
-                    elif depth == 2:
-                        cores_fatias.append('#87B6C4')
-                    else:
-                        cores_fatias.append('#C2E2EB')
+            if visao_alocacao == "🍩 Por Ativos":
+                df_sunburst = df_custodia_atual.copy()
+                texto_raiz = f"Carteira<br>{formatar_br(patrimonio_mercado_kpi)}"
+                df_sunburst['Raiz'] = texto_raiz
                 
-                fig_p.update_traces(marker=dict(
-                    colors=cores_fatias,
-                    line=dict(color='#1D4E5B', width=1.5)
-                ))
-            
-            fig_p.update_layout(
-                margin=dict(l=10, r=10, t=10, b=10), 
-                height=315, 
-                paper_bgcolor='rgba(0,0,0,0)',
-                dragmode=False
-            )
-            
-            fig_p.update_traces(
-                textinfo="label+percent root",
-                hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>'
-            )
-            
-            st.plotly_chart(fig_p, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-
-# ==============================================================================
-# ABA 2: EXPOSIÇÃO
-# ==============================================================================
-with aba_exposicao:
-    if not df_custodia_atual.empty:
-        df_analise = df_custodia_atual.copy()
-
-        col_esq, col_meio, col_dir = st.columns([3, 4, 3])
-        
-        ALTURA_PILARES = 440 
-        OVERHEAD_STREAMLIT = 74 
-        ALTURA_ROSCAS = (ALTURA_PILARES - OVERHEAD_STREAMLIT) / 2
-        
-        with col_esq:
-            with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>1. Exposição por Ativo</h4>", unsafe_allow_html=True)
-                df_ativos_sorted = df_analise.sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
-                
-                fig_bar_ativos = go.Figure(go.Bar(
-                    x=df_ativos_sorted['Patrimonio_Mercado_Ativo'], y=df_ativos_sorted['Ticker'],
-                    orientation='h', marker_color='#1fbc74',
-                    hovertemplate='<b>Ativo:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
-                ))
-                fig_bar_ativos.update_layout(
-                    margin=dict(l=55, r=10, t=10, b=10), height=ALTURA_PILARES, dragmode=False,
-                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
-                    yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
+                fig_p = px.sunburst(
+                    df_sunburst,
+                    path=['Raiz', 'Classificacao', 'Seguimento', 'Ticker'],
+                    values='Patrimonio_Mercado_Ativo'
                 )
-                st.plotly_chart(fig_bar_ativos, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-
-        with col_meio:
-            with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>2. Classificação</h4>", unsafe_allow_html=True)
-                df_g_tipo = df_analise.groupby('Classificacao')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
                 
-                fig_t = go.Figure(go.Pie(
-                    labels=df_g_tipo['Classificacao'], values=df_g_tipo['Patrimonio_Mercado_Ativo'], hole=0.55,
-                    textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
-                    hovertemplate='<b>Classe:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
-                ))
-                fig_t.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, dragmode=False, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
-                st.plotly_chart(fig_t, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+                if fig_p.data and fig_p.data[0].ids is not None:
+                    cores_fatias = []
+                    for id_str in fig_p.data[0].ids:
+                        depth = str(id_str).count('/')
+                        if depth == 0:
+                            cores_fatias.append('#1D4E5B')
+                        elif depth == 1:
+                            cores_fatias.append('#3A7385')
+                        elif depth == 2:
+                            cores_fatias.append('#87B6C4')
+                        else:
+                            cores_fatias.append('#C2E2EB')
+                    
+                    fig_p.update_traces(marker=dict(colors=cores_fatias, line=dict(color='#1D4E5B', width=1.5)))
                 
-            with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:2px; color:#2C3E50; font-size:13px; font-weight:600; text-transform:uppercase;'>3. Seguimento</h4>", unsafe_allow_html=True)
-                df_g_seg = df_analise.groupby('Seguimento')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=False)
+                fig_p.update_layout(margin=dict(l=10, r=10, t=5, b=10), height=280, paper_bgcolor='rgba(0,0,0,0)', dragmode=False)
+                fig_p.update_traces(textinfo="label+percent root", hovertemplate='<b>%{label}</b><br>Patrimônio: R$ %{value:,.2f}<extra></extra>')
+                st.plotly_chart(fig_p, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
                 
-                fig_s = go.Figure(go.Pie(
-                    labels=df_g_seg['Seguimento'], values=df_g_seg['Patrimonio_Mercado_Ativo'], hole=0.55,
-                    textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
-                    hovertemplate='<b>Seguimento:</b> %{label}<br><b>Patrimônio:</b> R$ %{value:,.2f}<extra></extra>'
-                ))
-                fig_s.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=ALTURA_ROSCAS, dragmode=False, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
-                st.plotly_chart(fig_s, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-
-        with col_dir:
-            with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:4px; color:#2C3E50; font-size:14px; font-weight:600; text-transform:uppercase;'>4. Exposição por Gestora</h4>", unsafe_allow_html=True)
-                df_g_gest = df_analise.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
+            else: # Visão "🏢 Por Gestora"
+                df_g_gest = df_custodia_atual.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index().sort_values(by='Patrimonio_Mercado_Ativo', ascending=True)
                 
                 fig_bar_gest = go.Figure(go.Bar(
                     x=df_g_gest['Patrimonio_Mercado_Ativo'], y=df_g_gest['Gestora'],
@@ -504,17 +443,15 @@ with aba_exposicao:
                     hovertemplate='<b>Gestora:</b> %{y}<br><b>Patrimônio:</b> R$ %{x:,.2f}<extra></extra>'
                 ))
                 fig_bar_gest.update_layout(
-                    margin=dict(l=75, r=10, t=10, b=10), height=ALTURA_PILARES, dragmode=False,
+                    margin=dict(l=75, r=10, t=5, b=10), height=280, dragmode=False,
                     plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat="~s"),
                     yaxis=dict(type='category', dtick=1, tickfont=dict(size=10))
                 )
                 st.plotly_chart(fig_bar_gest, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-    else:
-        st.info("ℹ️ Nenhum dado de custódia disponível para gerar o raio-x de exposição.")
 
 # ==============================================================================
-# ABA 3: PROVENTOS
+# ABA 2: PROVENTOS
 # ==============================================================================
 with aba_proventos:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Módulo de Renda Passiva</h3>", unsafe_allow_html=True)
@@ -608,7 +545,7 @@ with aba_proventos:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
 # ==============================================================================
-# ABA 4: REBALANCEAMENTO
+# ABA 3: REBALANCEAMENTO
 # ==============================================================================
 with aba_rebalanceamento:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Grade de Rebalanceamento Estratégico</h3>", unsafe_allow_html=True)
@@ -650,7 +587,6 @@ with aba_rebalanceamento:
         df_ativos_rebal['Meta_Ativo_Val'] = (df_ativos_rebal['Meta_Ativo_Pct'] / 100.0) * patrimonio_mercado_kpi
         df_ativos_rebal['Diferenca_Val'] = df_ativos_rebal['Meta_Ativo_Val'] - df_ativos_rebal['Patrimonio_Mercado_Ativo']
         
-        # 🎯 AJUSTE DE PERFORMANCE: Lógica Vetorizada (Substitui o .apply e deixa o filtro instantâneo)
         condicoes = [
             (df_ativos_rebal['Variacao_Pct'] <= -0.10),
             (df_ativos_rebal['Variacao_Pct'] >= 0.20),
@@ -658,11 +594,7 @@ with aba_rebalanceamento:
              (df_ativos_rebal['Preco_Mercado'] <= df_ativos_rebal['Preco_Medio']))
         ]
         
-        escolhas = [
-            "QUEDA BRUSCA", 
-            "VENDER", 
-            "🛒 COMPRAR"
-        ]
+        escolhas = ["QUEDA BRUSCA", "VENDER", "🛒 COMPRAR"]
         
         df_ativos_rebal['Ação Sugerida'] = np.select(condicoes, escolhas, default="🛡️ AGUARDAR")
         df_ativos_rebal['% Atual Ativo'] = (df_ativos_rebal['Patrimonio_Mercado_Ativo'] / patrimonio_mercado_kpi) * 100.0
@@ -723,7 +655,6 @@ with aba_rebalanceamento:
                 return 'color: #CD5C5C; font-weight: bold;'
             return ''
             
-        # 🎯 AJUSTE DE FORMATAÇÃO: Exibição de valores negativos/positivos na coluna Aporte Rec.
         df_styled = df_exibicao.style.format({
             'Preço Médio': formatar_br,
             'Preço Atual': formatar_br,
@@ -733,10 +664,6 @@ with aba_rebalanceamento:
             'Aporte Rec.': formatar_br 
         }).map(color_variacao, subset=['Variação'])
         
-        st.dataframe(
-            df_styled,
-            use_container_width=True,
-            hide_index=True
-        )
+        st.dataframe(df_styled, use_container_width=True, hide_index=True)
     else:
         st.info("ℹ️ Sem posições ativas em custódia para gerar matriz de rebalanceamento.")
