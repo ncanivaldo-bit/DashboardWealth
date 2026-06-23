@@ -261,7 +261,6 @@ def orquestrar_pipeline_carteira():
                 df_custodia_atual[col] = 'NÃO INFORMADO'
             df_custodia_atual[col] = df_custodia_atual[col].fillna('NÃO INFORMADO').astype(str).str.upper()
         
-        # 🎯 RETORNA TAMBÉM O df_inf PARA USO NOS FILTROS DE PROVENTOS
         return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas, df_inf
         
     return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-", pd.DataFrame(), pd.DataFrame()
@@ -480,15 +479,14 @@ with aba_proventos:
     df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
     if not df_prov_detalhe.empty:
-        # 🎯 Cruza os proventos com as informações de Classificação e Seguimento
-        if not df_inf.empty:
-            df_inf_merge = df_inf[['Ticker', 'Classificacao', 'Seguimento']].drop_duplicates(subset=['Ticker'])
-            df_prov_detalhe = df_prov_detalhe.merge(df_inf_merge, on='Ticker', how='left')
-            df_prov_detalhe['Classificacao'] = df_prov_detalhe['Classificacao'].fillna('NÃO INFORMADO').astype(str).str.upper()
-            df_prov_detalhe['Seguimento'] = df_prov_detalhe['Seguimento'].fillna('NÃO INFORMADO').astype(str).str.upper()
-        else:
-            df_prov_detalhe['Classificacao'] = 'NÃO INFORMADO'
-            df_prov_detalhe['Seguimento'] = 'NÃO INFORMADO'
+        # 🎯 Mapeia Classificação e Seguimento de forma segura (Evita conflito de colunas "_x" e "_y")
+        for col_alvo in ['Classificacao', 'Seguimento']:
+            if not df_inf.empty and col_alvo in df_inf.columns:
+                # Cria um dicionário "PROCV" seguro usando o df_inf
+                dict_map = df_inf.drop_duplicates('Ticker').set_index('Ticker')[col_alvo].to_dict()
+                df_prov_detalhe[col_alvo] = df_prov_detalhe['Ticker'].map(dict_map).fillna('NÃO INFORMADO').astype(str).str.upper()
+            else:
+                df_prov_detalhe[col_alvo] = 'NÃO INFORMADO'
 
         # 🎯 FILTROS DINÂMICOS
         col_filtro1, col_filtro2 = st.columns(2)
