@@ -261,9 +261,9 @@ def orquestrar_pipeline_carteira():
                 df_custodia_atual[col] = 'NÃO INFORMADO'
             df_custodia_atual[col] = df_custodia_atual[col].fillna('NÃO INFORMADO').astype(str).str.upper()
         
-        return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas, df_inf
+        return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas
         
-    return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-", pd.DataFrame(), pd.DataFrame()
+    return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-", pd.DataFrame()
 
 # ==============================================================================
 # 6. EXECUÇÃO DA INTERFACE VISUAL
@@ -273,7 +273,7 @@ PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
 
 try:
     with st.spinner('A sincronizar custódia com a nuvem...'):
-        df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas, df_inf = orquestrar_pipeline_carteira()
+        df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas = orquestrar_pipeline_carteira()
 except Exception as e:
     st.error("⚠️ Falha ao sincronizar com a base de dados. Verifique a sua ligação.")
     st.stop()
@@ -479,149 +479,87 @@ with aba_proventos:
     df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
     if not df_prov_detalhe.empty:
-        # 🎯 Mapeia Classificação e Seguimento de forma segura (Evita conflito de colunas "_x" e "_y")
-        for col_alvo in ['Classificacao', 'Seguimento']:
-            if not df_inf.empty and col_alvo in df_inf.columns:
-                # Cria um dicionário "PROCV" seguro usando o df_inf
-                dict_map = df_inf.drop_duplicates('Ticker').set_index('Ticker')[col_alvo].to_dict()
-                df_prov_detalhe[col_alvo] = df_prov_detalhe['Ticker'].map(dict_map).fillna('NÃO INFORMADO').astype(str).str.upper()
-            else:
-                df_prov_detalhe[col_alvo] = 'NÃO INFORMADO'
-
-        # 🎯 FILTROS DINÂMICOS
-        col_filtro1, col_filtro2 = st.columns(2)
-        with col_filtro1:
-            lista_class = ["TODOS"] + sorted(df_prov_detalhe['Classificacao'].unique().tolist())
-            filtro_class = st.selectbox("Filtrar por Classificação (Ex: Tijolo/Papel):", lista_class)
-            
-        with col_filtro2:
-            if filtro_class != "TODOS":
-                opcoes_seg = df_prov_detalhe[df_prov_detalhe['Classificacao'] == filtro_class]['Seguimento'].unique().tolist()
-            else:
-                opcoes_seg = df_prov_detalhe['Seguimento'].unique().tolist()
-            lista_seg = ["TODOS"] + sorted(opcoes_seg)
-            filtro_seg = st.selectbox("Filtrar por Seguimento:", lista_seg)
-
-        # 🎯 APLICA OS FILTROS NO DATAFRAME
-        if filtro_class != "TODOS":
-            df_prov_detalhe = df_prov_detalhe[df_prov_detalhe['Classificacao'] == filtro_class]
-        if filtro_seg != "TODOS":
-            df_prov_detalhe = df_prov_detalhe[df_prov_detalhe['Seguimento'] == filtro_seg]
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # Se sobrar algum dado após o filtro, renderiza a tela
-        if not df_prov_detalhe.empty:
-            df_prov_detalhe['AnoMes'] = df_prov_detalhe['Data_Datetime'].dt.to_period('M')
-            proventos_por_mes = df_prov_detalhe.groupby('AnoMes')['Valor_Operacao_Num'].sum().sort_index()
-            
-            tot_div_filtrado = float(df_prov_detalhe['Valor_Operacao_Num'].sum())
-            ult_prov_val_filt = float(proventos_por_mes.iloc[-1]) if not proventos_por_mes.empty else 0.0
-            ult_prov_mes_filt = proventos_por_mes.index[-1].strftime('%m/%Y') if not proventos_por_mes.empty else "-"
-            
-            # Ajuste de Total Investido para Yield On Cost (somente os ativos que sobraram no filtro)
-            tickers_filtrados = df_prov_detalhe['Ticker'].unique()
-            df_custodia_filt = df_custodia_atual[df_custodia_atual['Ticker'].isin(tickers_filtrados)]
-            tot_inv_filt = float(df_custodia_filt['Custo_Total'].sum())
-
-            media_mensal_prov = tot_div_filtrado / max(len(proventos_por_mes), 1)
-            yoc_medio = (tot_div_filtrado / tot_inv_filt * 100) if tot_inv_filt > 0 else 0.0
-            yield_ultimo_mensal = (ult_prov_val_filt / tot_inv_filt * 100) if tot_inv_filt > 0 else 0.0
-            
-            cp1, cp2, cp3 = st.columns(3)
-            
-            with cp1:
-                st.markdown(f"""
-                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                        <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Último Provento Recebido</span>
-                        <div style="color: #2E8B57; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(ult_prov_val_filt)}</div>
-                        <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                            <div>
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Rep. na Categoria:</span>
-                                <strong style="color: #2E8B57;">{yield_ultimo_mensal:.2f}%</strong>
-                            </div>
-                            <div style="text-align: right;">
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Ref:</span>
-                                <strong style="color: #34495E;">{ult_prov_mes_filt}</strong>
-                            </div>
+        media_mensal_prov = total_dividendos / max(len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique()), 1)
+        yoc_medio = (total_dividendos / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
+        yield_ultimo_mensal = (ult_provento_val / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
+        
+        cp1, cp2, cp3 = st.columns(3)
+        
+        with cp1:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                    <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Último Provento Recebido</span>
+                    <div style="color: #2E8B57; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(ult_provento_val)}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Representação/Aporte:</span>
+                            <strong style="color: #2E8B57;">{yield_ultimo_mensal:.2f}% do inv.</strong>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Ref:</span>
+                            <strong style="color: #34495E;">{ult_provento_mes}</strong>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
-                
-            with cp2:
-                st.markdown(f"""
-                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                        <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Total Histórico Filtrado</span>
-                        <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(tot_div_filtrado)}</div>
-                        <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                            <div>
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Yield on Cost Médio:</span>
-                                <strong style="color: #118DFF;">{yoc_medio:.2f}% Amort.</strong>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            with cp3:
-                st.markdown(f"""
-                    <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
-                        <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Média Mensal de Caixa</span>
-                        <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(media_mensal_prov)}</div>
-                        <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
-                            <div>
-                                <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Meses com Histórico:</span>
-                                <strong style="color: #34495E;">{len(proventos_por_mes)} meses</strong>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            col_graf_esq, col_graf_dir = st.columns([6, 4])
+                </div>
+            """, unsafe_allow_html=True)
             
-            with col_graf_esq:
-                with st.container(border=True):
-                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Evolução de Caixa Mensal (Proventos)</h4>", unsafe_allow_html=True)
-                    df_cron_prov = df_prov_detalhe.groupby('Data_Datetime').agg({'Valor_Operacao_Num':'sum'}).resample('ME').sum().reset_index()
-                    df_cron_prov['Mês'] = df_cron_prov['Data_Datetime'].dt.strftime('%m/%Y')
-                    
-                    fig_bar_prov = go.Figure(go.Bar(
-                        x=df_cron_prov['Mês'], y=df_cron_prov['Valor_Operacao_Num'],
-                        marker_color='#2E8B57',
-                        hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
-                    ))
-                    fig_bar_prov.update_layout(margin=dict(l=40, r=10, t=10, b=10), height=300, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
-                    st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-                    
-            with col_graf_dir:
-                with st.container(border=True):
-                    st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Ranking de Pagadores</h4>", unsafe_allow_html=True)
-                    
-                    # 🎯 MENU SUSPENSO PARA SUBSTITUIR O "CLIQUE NO GRÁFICO"
-                    meses_disponiveis = df_cron_prov['Mês'].tolist()
-                    mes_selecionado = st.selectbox("Selecione o Mês:", ["Histórico Completo"] + meses_disponiveis[::-1], label_visibility="collapsed")
-                    
-                    # 🎯 APLICA O FILTRO DE MÊS OU PEGA O ACUMULADO
-                    if mes_selecionado != "Histórico Completo":
-                        df_rank_base = df_prov_detalhe[df_prov_detalhe['Data_Datetime'].dt.strftime('%m/%Y') == mes_selecionado]
-                        titulo_hover = f"Pago em {mes_selecionado}"
-                    else:
-                        df_rank_base = df_prov_detalhe
-                        titulo_hover = "Total Histórico"
-                    
-                    df_ranking_ativos = df_rank_base.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True)
-                    
-                    # 🎯 ALTURA DINÂMICA PARA MOSTRAR TODOS OS ATIVOS SEM ACHATAR
-                    altura_dinamica = max(235, len(df_ranking_ativos) * 28)
-                    
-                    fig_rank = go.Figure(go.Bar(
-                        x=df_ranking_ativos['Valor_Operacao_Num'], y=df_ranking_ativos['Ticker'],
-                        orientation='h', marker_color='#FFD700',
-                        hovertemplate=f'<b>Ativo:</b> %{{y}}<br><b>{titulo_hover}:</b> R$ %{{x:,.2f}}<extra></extra>'
-                    ))
-                    fig_rank.update_layout(margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
-                    st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
-        else:
-            st.warning("⚠️ Nenhum provento encontrado para a combinação de filtros selecionada.")
+        with cp2:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                    <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Total de Proventos Históricos</span>
+                    <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(total_dividendos)}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Yield on Cost Médio:</span>
+                            <strong style="color: #118DFF;">{yoc_medio:.2f}% Amort.</strong>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with cp3:
+            st.markdown(f"""
+                <div style="border: 1px solid #E6E8EA; border-radius: 8px; padding: 10px; background-color: #F8F9FA; box-shadow: 1px 1px 3px rgba(0,0,0,0.03); min-height: 110px; max-height: 110px;">
+                    <span style="color: #5D6D7E; font-size: 14px; font-weight: bold; text-transform: uppercase;">Média Mensal de Caixa</span>
+                    <div style="color: #2C3E50; font-size: 27px; font-weight: 700; margin-top: 1px; margin-bottom: 1px; letter-spacing: -0.5px;">{formatar_br(media_mensal_prov)}</div>
+                    <div style="border-top: 1px solid #E6E8EA; padding-top: 4px; font-size: 13px; color: #7F8C8D; display: flex; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 12px; color: #7F8C8D; text-transform: uppercase;">Meses com Histórico:</span>
+                            <strong style="color: #34495E;">{len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique())} meses</strong>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        col_graf_esq, col_graf_dir = st.columns([6, 4])
+        
+        with col_graf_esq:
+            with st.container(border=True):
+                st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Evolução de Caixa Mensal (Proventos)</h4>", unsafe_allow_html=True)
+                df_prov_detalhe['Mes_Ano_Str'] = df_prov_detalhe['Data_Datetime'].dt.strftime('%m/%Y')
+                df_cron_prov = df_prov_detalhe.groupby('Data_Datetime').agg({'Valor_Operacao_Num':'sum'}).resample('ME').sum().reset_index()
+                df_cron_prov['Mês'] = df_cron_prov['Data_Datetime'].dt.strftime('%m/%Y')
+                
+                fig_bar_prov = go.Figure(go.Bar(
+                    x=df_cron_prov['Mês'], y=df_cron_prov['Valor_Operacao_Num'],
+                    marker_color='#2E8B57',
+                    hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
+                ))
+                fig_bar_prov.update_layout(margin=dict(l=40, r=10, t=10, b=10), height=260, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
+                st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+                
+        with col_graf_dir:
+            with st.container(border=True):
+                st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Top Pagadores da Carteira (Acumulado)</h4>", unsafe_allow_html=True)
+                df_ranking_ativos = df_prov_detalhe.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True).tail(5)
+                
+                fig_rank = go.Figure(go.Bar(
+                    x=df_ranking_ativos['Valor_Operacao_Num'], y=df_ranking_ativos['Ticker'],
+                    orientation='h', marker_color='#FFD700',
+                    hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
+                ))
+                fig_rank.update_layout(margin=dict(l=55, r=10, t=10, b=10), height=260, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
+                st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
     else:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
