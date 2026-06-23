@@ -261,9 +261,9 @@ def orquestrar_pipeline_carteira():
                 df_custodia_atual[col] = 'NÃO INFORMADO'
             df_custodia_atual[col] = df_custodia_atual[col].fillna('NÃO INFORMADO').astype(str).str.upper()
         
-        return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas
+        return df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas, df_inf
         
-    return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-", pd.DataFrame()
+    return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 0.0, 0.0, "-", pd.DataFrame(), pd.DataFrame()
 
 # ==============================================================================
 # 6. EXECUÇÃO DA INTERFACE VISUAL
@@ -273,7 +273,7 @@ PLOTLY_CONFIG_MOBILE = {'displayModeBar': False, 'scrollZoom': False}
 
 try:
     with st.spinner('A sincronizar custódia com a nuvem...'):
-        df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas = orquestrar_pipeline_carteira()
+        df_mov, df_consolidado, df_custodia_atual, total_dividendos, ult_provento_val, ult_provento_mes, df_metricas, df_inf = orquestrar_pipeline_carteira()
 except Exception as e:
     st.error("⚠️ Falha ao sincronizar com a base de dados. Verifique a sua ligação.")
     st.stop()
@@ -479,6 +479,14 @@ with aba_proventos:
     df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
     
     if not df_prov_detalhe.empty:
+        # 🎯 MAPEA OS DADOS PARA PODERMOS USAR NAS SUB-ABAS DE CLASSE E SEGUIMENTO
+        for col_alvo in ['Classificacao', 'Seguimento']:
+            if not df_inf.empty and col_alvo in df_inf.columns:
+                dict_map = df_inf.drop_duplicates('Ticker').set_index('Ticker')[col_alvo].to_dict()
+                df_prov_detalhe[col_alvo] = df_prov_detalhe['Ticker'].map(dict_map).fillna('NÃO INFORMADO').astype(str).str.upper()
+            else:
+                df_prov_detalhe[col_alvo] = 'NÃO INFORMADO'
+                
         media_mensal_prov = total_dividendos / max(len(df_prov_detalhe['Data_Datetime'].dt.to_period('M').unique()), 1)
         yoc_medio = (total_dividendos / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
         yield_ultimo_mensal = (ult_provento_val / total_investido_kpi * 100) if total_investido_kpi > 0 else 0.0
@@ -550,16 +558,47 @@ with aba_proventos:
                 
         with col_graf_dir:
             with st.container(border=True):
-                st.markdown("<h4 style='margin:0; padding-bottom:5px; font-size:15px; color:#2C3E50;'>Top Pagadores da Carteira (Acumulado)</h4>", unsafe_allow_html=True)
-                df_ranking_ativos = df_prov_detalhe.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True).tail(5)
+                # 🎯 SOLUÇÃO DE TAMANHO ESTÁTICO: Sub-abas!
+                st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
+                aba_prov_ativo, aba_prov_class, aba_prov_seg = st.tabs(["🎯 Ativo", "📊 Classe", "🏢 Seg."])
                 
-                fig_rank = go.Figure(go.Bar(
-                    x=df_ranking_ativos['Valor_Operacao_Num'], y=df_ranking_ativos['Ticker'],
-                    orientation='h', marker_color='#FFD700',
-                    hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
-                ))
-                fig_rank.update_layout(margin=dict(l=55, r=10, t=10, b=10), height=260, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
-                st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+                with aba_prov_ativo:
+                    # Limita a 7 para não esmagar as barras na altura fixa
+                    df_ranking_ativos = df_prov_detalhe.groupby('Ticker')['Valor_Operacao_Num'].sum().reset_index().sort_values(by='Valor_Operacao_Num', ascending=True).tail(7)
+                    
+                    fig_rank = go.Figure(go.Bar(
+                        x=df_ranking_ativos['Valor_Operacao_Num'], y=df_ranking_ativos['Ticker'],
+                        orientation='h', marker_color='#FFD700',
+                        hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
+                    ))
+                    # Altura travada em 235 para alinhar com o gráfico do lado esquerdo
+                    fig_rank.update_layout(margin=dict(l=55, r=10, t=5, b=5), height=235, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ "))
+                    st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+
+                with aba_prov_class:
+                    df_g_class = df_prov_detalhe.groupby('Classificacao')['Valor_Operacao_Num'].sum().reset_index()
+                    
+                    fig_class = go.Figure(go.Pie(
+                        labels=df_g_class['Classificacao'], values=df_g_class['Valor_Operacao_Num'], hole=0.55,
+                        textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
+                        hovertemplate='<b>Classe:</b> %{label}<br><b>Proventos:</b> R$ %{value:,.2f}<extra></extra>'
+                    ))
+                    # Altura travada em 235
+                    fig_class.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=235, dragmode=False, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
+                    st.plotly_chart(fig_class, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+
+                with aba_prov_seg:
+                    df_g_seg = df_prov_detalhe.groupby('Seguimento')['Valor_Operacao_Num'].sum().reset_index()
+                    
+                    fig_seg = go.Figure(go.Pie(
+                        labels=df_g_seg['Seguimento'], values=df_g_seg['Valor_Operacao_Num'], hole=0.55,
+                        textinfo='label+percent', textposition='inside', insidetextorientation='horizontal',
+                        hovertemplate='<b>Seguimento:</b> %{label}<br><b>Proventos:</b> R$ %{value:,.2f}<extra></extra>'
+                    ))
+                    # Altura travada em 235
+                    fig_seg.update_layout(margin=dict(l=5, r=5, t=5, b=0), height=235, dragmode=False, paper_bgcolor='rgba(0,0,0,0)', showlegend=False)
+                    st.plotly_chart(fig_seg, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
+
     else:
         st.info("ℹ️ Nenhuma movimentação de dividendos ou rendimentos mapeada na aba Movimentacao.")
 
