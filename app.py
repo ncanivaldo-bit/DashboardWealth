@@ -20,7 +20,7 @@ st.markdown("""
         /* Trava de zoom acidental no telemóvel */
         * { touch-action: manipulation; }
         
-        [data-testid="stHeader"] { display: none !important; visibility: hidden; }
+        /* Ajustes de espaçamento do container principal */
         [data-testid="stMainBlockContainer"] {
             padding-top: 0.8rem !important;
             padding-bottom: 0.8rem !important;
@@ -45,6 +45,10 @@ st.markdown("""
             font-size: 26px !important; 
             font-weight: 700 !important;
         }
+        
+        /* =======================================================
+           OCULTAR ELEMENTOS NATIVOS E MARCAS DO STREAMLIT
+           ======================================================= */
         #MainMenu { visibility: hidden !important; display: none !important; }
         footer { visibility: hidden !important; display: none !important; }
         header { visibility: hidden !important; display: none !important; }
@@ -52,6 +56,13 @@ st.markdown("""
         [data-testid="stDecoration"] { visibility: hidden !important; display: none !important; }
         [data-testid="stStatusWidget"] { visibility: hidden !important; display: none !important; }
         .stDeployButton { display: none !important; }
+        
+        /* Ocultar selos flutuantes e botões da nuvem do Streamlit no canto inferior direito */
+        [data-testid="stViewerBadge"] { display: none !important; visibility: hidden !important; }
+        .viewerBadge_container { display: none !important; visibility: hidden !important; }
+        .viewerBadge_link { display: none !important; visibility: hidden !important; }
+        #manage-app-button { display: none !important; visibility: hidden !important; }
+        [class^="viewerBadge"] { display: none !important; visibility: hidden !important; }
     </style>
 """, unsafe_allow_html=True)
 
