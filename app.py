@@ -398,7 +398,8 @@ with aba_resumo:
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Patrimonio_Mercado_Ativo'], mode='lines+markers', name='Patrimônio Atual', line=dict(color='#1fbc74', width=3), marker=dict(size=6), fill='tozeroy', fillcolor='rgba(31, 188, 116, 0.06)'))
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Custo_Total'], mode='lines', name='Total Investido', line=dict(color='#118DFF', width=2, dash='dot')))
             
-            fig_linhas.update_layout(separators=".,", margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.0f", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
+            # 🎯 Correção: separators=",."
+            fig_linhas.update_layout(separators=",.", margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.0f", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
             st.plotly_chart(fig_linhas, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
     with col_bloco_direito:
@@ -435,8 +436,9 @@ with aba_resumo:
                         line=dict(color='#1D4E5B', width=1.5)
                     ))
                 
+                # 🎯 Correção: separators=",."
                 fig_p.update_layout(
-                    separators=".,",
+                    separators=",.",
                     margin=dict(l=10, r=10, t=10, b=10), 
                     height=295, 
                     paper_bgcolor='rgba(0,0,0,0)',
@@ -462,8 +464,9 @@ with aba_resumo:
                         color_discrete_sequence=['#3A7385', '#118DFF', '#87B6C4', '#1D4E5B', '#C2E2EB']
                     )
                     
+                    # 🎯 Correção: separators=",."
                     fig_tree_gest.update_layout(
-                        separators=".,",
+                        separators=",.",
                         margin=dict(l=0, r=0, t=20, b=0), 
                         height=295, 
                         paper_bgcolor='rgba(0,0,0,0)',
@@ -608,7 +611,8 @@ with aba_proventos:
                         marker_color='#2E8B57',
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    fig_bar_prov.update_layout(separators=".,", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
+                    # 🎯 Correção: separators=",."
+                    fig_bar_prov.update_layout(separators=",.", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
                     st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
                     
             with col_graf_dir:
@@ -624,7 +628,8 @@ with aba_proventos:
                         orientation='h', marker_color='#FFD700',
                         hovertemplate='<b>Ativo:</b> %{y}<br><b>Total Pago:</b> R$ %{x:,.2f}<extra></extra>'
                     ))
-                    fig_rank.update_layout(separators=".,", margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
+                    # 🎯 Correção: separators=",."
+                    fig_rank.update_layout(separators=",.", margin=dict(l=55, r=10, t=10, b=10), height=altura_dinamica, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis=dict(gridcolor='rgba(230,235,240,0.6)', tickprefix="R$ ", tickformat=",.2f"))
                     st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
         else:
             st.warning("⚠️ Nenhum provento encontrado para a combinação de filtros selecionada.")
@@ -728,7 +733,6 @@ with aba_rebalanceamento:
             
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 🎯 ADIÇÃO DAS NOVAS COLUNAS NA TABELA DE REBALANCEAMENTO
         df_exibicao = df_ativos_filtrados[['Ticker', 'Seguimento', 'Quantidade', 'Custo_Total', 'Patrimonio_Mercado_Ativo', 'Preco_Medio', 'Preco_Mercado', 'Variacao_Pct', '% Atual Ativo', 'Meta_Ativo_Pct', 'Diferenca_Val', 'Ação Sugerida']].copy()
         df_exibicao.columns = ['Ativo', 'Seguimento', 'Qtd', 'Investido', 'Saldo Atual', 'Preço Médio', 'Preço Atual', 'Variação', '% Atual', 'Meta Ideal', 'Aporte Rec.', 'Ação Sugerida']
         
