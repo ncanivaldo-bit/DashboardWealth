@@ -473,7 +473,7 @@ with aba_resumo:
 # ABA 2: PROVENTOS
 # ==============================================================================
 with aba_proventos:
-    st.markdown("<h3 style='margin:0; padding-top:4px; color:#2C3E50; font-size:22px; font-weight:600;'>Módulo de Renda Passiva</h3>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
     
     termos_proventos = ['Dividendo', 'JCP', 'Rendimento', 'Provento']
     df_prov_detalhe = df_mov[df_mov['Movimentação'].isin(termos_proventos)].copy()
@@ -486,9 +486,12 @@ with aba_proventos:
                 df_prov_detalhe[col_alvo] = df_prov_detalhe['Ticker'].map(dict_map).fillna('NÃO INFORMADO').astype(str).str.upper()
             else:
                 df_prov_detalhe[col_alvo] = 'NÃO INFORMADO'
+        
+        # Cria a coluna de Mês para filtro
+        df_prov_detalhe['Mes_Ano_Str'] = df_prov_detalhe['Data_Datetime'].dt.strftime('%m/%Y')
 
         # 🎯 FILTROS CASCATA ALINHADOS NO TOPO DA ABA
-        col_f1, col_f2, col_f3 = st.columns(3)
+        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
         with col_f1:
             lista_class = ["TODOS"] + sorted(df_prov_detalhe['Classificacao'].unique().tolist())
             filtro_class = st.selectbox("Classe:", lista_class)
@@ -505,8 +508,15 @@ with aba_proventos:
             lista_ativo = ["TODOS"] + sorted(df_f2['Ticker'].unique().tolist())
             filtro_ativo = st.selectbox("Ativo:", lista_ativo)
 
-        # Filtro final aplicado na tabela
-        df_prov_detalhe = df_f2 if filtro_ativo == "TODOS" else df_f2[df_f2['Ticker'] == filtro_ativo]
+        df_f3 = df_f2 if filtro_ativo == "TODOS" else df_f2[df_f2['Ticker'] == filtro_ativo]
+        
+        with col_f4:
+            lista_meses = df_f3['Data_Datetime'].dt.to_period('M').sort_values(ascending=False).dt.strftime('%m/%Y').unique().tolist()
+            lista_mes = ["TODOS"] + lista_meses
+            filtro_mes = st.selectbox("Mês:", lista_mes)
+            
+        # Filtro final aplicado
+        df_prov_detalhe = df_f3 if filtro_mes == "TODOS" else df_f3[df_f3['Mes_Ano_Str'] == filtro_mes]
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -574,6 +584,9 @@ with aba_proventos:
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+                
+            # 🎯 ESPAÇAMENTO ENTRE KPIs E GRÁFICOS
+            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
                 
             col_graf_esq, col_graf_dir = st.columns([6, 4])
             
