@@ -466,12 +466,13 @@ with aba_resumo:
 
             with sub_aba_gestora:
                 if not df_custodia_atual.empty:
-                    df_g_gest = df_custodia_atual.groupby('Gestora')['Patrimonio_Mercado_Ativo'].sum().reset_index()
+                    # 🎯 Adicionado o Ticker ao Treemap para permitir drill-down
+                    df_g_gest = df_custodia_atual[['Gestora', 'Ticker', 'Patrimonio_Mercado_Ativo']].copy()
                     df_g_gest['Raiz'] = "Gestoras"
                     
                     fig_tree_gest = px.treemap(
                         df_g_gest,
-                        path=['Raiz', 'Gestora'],
+                        path=['Raiz', 'Gestora', 'Ticker'],
                         values='Patrimonio_Mercado_Ativo',
                         color_discrete_sequence=['#3A7385', '#118DFF', '#87B6C4', '#1D4E5B', '#C2E2EB']
                     )
