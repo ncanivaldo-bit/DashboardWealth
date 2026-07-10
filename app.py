@@ -20,28 +20,30 @@ st.markdown("""
         /* Trava de zoom acidental no telemóvel */
         * { touch-action: manipulation; }
         
-        /* Ajustes de espaçamento do container principal */
+        /* Ajustes de espaçamento do container principal - Atualizado para evitar clipping */
         [data-testid="stMainBlockContainer"] {
-            padding-top: 0.8rem !important;
-            padding-bottom: 0.8rem !important;
+            padding-top: 1.5rem !important;
+            padding-bottom: 1rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
             max-width: 100% !important;
         }
+        
+        /* Ajustes das abas sem margens negativas agressivas */
         [data-testid="stTabs"] {
-            margin-top: -25px !important;
-            margin-bottom: 0px !important;
+            margin-top: 0px !important;
+            margin-bottom: 10px !important;
         }
         [data-testid="stTabPanel"] {
-            padding-top: 0rem !important;
-            margin-top: -35px !important;
+            padding-top: 0.5rem !important;
+            margin-top: 0px !important;
         }
         [data-testid="column"] > div {
             gap: 0.3rem !important;
         }
         h1 { 
-            margin-top: -25px !important; 
-            margin-bottom: 5px !important; 
+            margin-top: 0px !important; 
+            margin-bottom: 15px !important; 
             font-size: 26px !important; 
             font-weight: 700 !important;
         }
@@ -399,7 +401,6 @@ with aba_resumo:
             </div>
         """, unsafe_allow_html=True)
 
-    st.markdown('<div style="margin-top: -15px;">', unsafe_allow_html=True)
     col_bloco_esquerdo, col_bloco_direito = st.columns([6, 4])
 
     with col_bloco_esquerdo:
@@ -466,7 +467,6 @@ with aba_resumo:
 
             with sub_aba_gestora:
                 if not df_custodia_atual.empty:
-                    # 🎯 Adicionado o Ticker ao Treemap para permitir drill-down
                     df_g_gest = df_custodia_atual[['Gestora', 'Ticker', 'Patrimonio_Mercado_Ativo']].copy()
                     df_g_gest['Raiz'] = "Gestoras"
                     
