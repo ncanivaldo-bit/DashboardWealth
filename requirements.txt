@@ -1,7 +1,8 @@
-streamlit==1.38.0
+streamlit
 pandas
 numpy
 plotly
 openpyxl
 google-api-python-client
 google-auth
+Pillow==10.3.0
