@@ -16,11 +16,13 @@ from googleapiclient.http import MediaIoBaseDownload
 st.set_page_config(page_title="PREVPRIV", page_icon="📊", layout="wide")
 
 st.markdown("""
+    <meta name="google" content="notranslate">
     <style>
-        /* Trava de zoom acidental no telemóvel */
+        /* Trava de zoom acidental no telemóvel e prevenção de tradução automática */
         * { touch-action: manipulation; }
+        body { translate: no; }
         
-        /* Ajustes de espaçamento do container principal - Atualizado para evitar clipping */
+        /* Ajustes de espaçamento do container principal */
         [data-testid="stMainBlockContainer"] {
             padding-top: 1.5rem !important;
             padding-bottom: 1rem !important;
@@ -223,6 +225,9 @@ def orquestrar_pipeline_carteira():
     df_inf['Ticker'] = df_inf['Ticker'].replace(conversao_tickers)
     df_precos_historicos['Ticker'] = df_precos_historicos['Ticker'].replace(conversao_tickers)
     
+    # 🎯 CORREÇÃO CRÍTICA PARA GRÁFICO DISTORCIDO: Prevenir preços duplicados que corrompiam a agregação
+    df_precos_historicos = df_precos_historicos.drop_duplicates(subset=['Chave_Merge', 'Ticker'], keep='last')
+    
     df_mov['Quantidade_Num'] = pd.to_numeric(df_mov['Quantidade'], errors='coerce').fillna(0)
     df_mov['Valor_Operacao_Num'] = pd.to_numeric(df_mov['Valor da Operação'], errors='coerce').fillna(0)
     df_mov['Data_Datetime'] = pd.to_datetime(df_mov['Data'], format='%Y-%m-%d', errors='coerce')
@@ -407,8 +412,8 @@ with aba_resumo:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; color:var(--text-color); font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
             
-            # 🎯 CORREÇÃO DE DISTORÇÃO CRONOLÓGICA (sort_values)
             df_totais_mensais = df_consolidado.groupby('Mes_Ano').agg({'Custo_Total':'sum', 'Patrimonio_Mercado_Ativo':'sum'}).reset_index()
+            # Forçar a ordenação cronológica pura para impedir saltos da linha no gráfico
             df_totais_mensais = df_totais_mensais.sort_values('Mes_Ano')
             df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
             
@@ -416,7 +421,8 @@ with aba_resumo:
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Patrimonio_Mercado_Ativo'], mode='lines+markers', name='Patrimônio Atual', line=dict(color='#1fbc74', width=3), marker=dict(size=6), fill='tozeroy', fillcolor='rgba(31, 188, 116, 0.06)'))
             fig_linhas.add_trace(go.Scatter(x=df_totais_mensais['Mês_Exibição'], y=df_totais_mensais['Custo_Total'], mode='lines', name='Total Investido', line=dict(color='#118DFF', width=2, dash='dot')))
             
-            fig_linhas.update_layout(separators=",.", margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.0f", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category'), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
+            # Adicionado categoryorder explícito para o Plotly não distorcer a linha no tempo
+            fig_linhas.update_layout(separators=",.", margin=dict(l=45, r=10, t=25, b=10), height=340, hovermode='x unified', dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.0f", nticks=6), xaxis=dict(gridcolor='rgba(0,0,0,0)', type='category', categoryorder='array', categoryarray=df_totais_mensais['Mês_Exibição'].tolist()), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
             st.plotly_chart(fig_linhas, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
 
     with col_bloco_direito:
@@ -626,7 +632,7 @@ with aba_proventos:
                         marker_color='#2E8B57',
                         hovertemplate='<b>Mês:</b> %{x}<br><b>Provento:</b> R$ %{y:,.2f}<extra></extra>'
                     ))
-                    fig_bar_prov.update_layout(separators=",.", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.2f"))
+                    fig_bar_prov.update_layout(separators=",.", margin=dict(l=40, r=10, t=10, b=10), height=280, dragmode=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', yaxis=dict(gridcolor='rgba(128,128,128,0.2)', tickprefix="R$ ", tickformat=",.2f"), xaxis=dict(type='category', categoryorder='array', categoryarray=df_cron_prov['Mês'].tolist()))
                     st.plotly_chart(fig_bar_prov, use_container_width=True, config=PLOTLY_CONFIG_MOBILE)
                     
             with col_graf_dir:
