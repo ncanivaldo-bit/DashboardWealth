@@ -406,7 +406,10 @@ with aba_resumo:
     with col_bloco_esquerdo:
         with st.container(border=True):
             st.markdown("<h3 style='margin:0; padding-top:4px; color:var(--text-color); font-size:19px; font-weight:600;'>Evolução do Patrimônio</h3>", unsafe_allow_html=True)
+            
+            # 🎯 CORREÇÃO DE DISTORÇÃO CRONOLÓGICA (sort_values)
             df_totais_mensais = df_consolidado.groupby('Mes_Ano').agg({'Custo_Total':'sum', 'Patrimonio_Mercado_Ativo':'sum'}).reset_index()
+            df_totais_mensais = df_totais_mensais.sort_values('Mes_Ano')
             df_totais_mensais['Mês_Exibição'] = df_totais_mensais['Mes_Ano'].dt.strftime('%m/%Y')
             
             fig_linhas = go.Figure()
