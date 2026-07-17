@@ -1,8 +1,8 @@
-streamlit
+streamlit==1.34.0
 pandas
 numpy
 plotly
 openpyxl
 google-api-python-client
-google-auth
-Pillow==10.3.0
+google-auth-oauthlib
+google-auth-httplib2
